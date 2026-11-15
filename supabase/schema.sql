@@ -48,6 +48,10 @@ create policy "own records" on public.records
 
 grant usage on sequence public.records_seq to authenticated;
 
+-- 未ログインでも表への問い合わせ自体はできるようにする（行は上の決まりで1件も見えない）。
+-- プロジェクトを止めないための定期的な問い合わせ（.github/workflows/keepalive.yml）が使う。
+grant select on public.records to anon;
+
 -- 写真の置き場。非公開で、"ユーザーID/写真ID" というパスに置く。
 insert into storage.buckets (id, name, public)
 values ('attachments', 'attachments', false)

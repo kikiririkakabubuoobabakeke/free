@@ -43,6 +43,17 @@ tests/          データ操作と同期のテスト
 `SUPABASE_URL` と `SUPABASE_ANON_KEY` を登録しておくと、ビルドしたアプリに埋め込まれる
 （anon key は公開されてよい鍵で、自分の行しか読み書きできない設定になっている）。
 
+#### Supabaseを止めないために
+
+Supabase の無料プロジェクトは、しばらく使われないと一時停止される。日記を書かない日が続いても止まらないよう、
+GitHub Actions（[`keepalive.yml`](.github/workflows/keepalive.yml)）が毎日1回データベースに問い合わせる。
+上の `SUPABASE_URL` と `SUPABASE_ANON_KEY` を Variables に登録すると働き始める（未登録の間は何もしない）。
+Actions の「Supabaseを起こしておく」→ Run workflow で、すぐに1回試せる。
+
+- 応答が無かった日は実行が失敗になり、GitHub からメールが届く。
+- GitHub 側にも決まりがあり、リポジトリに60日間何も動きが無いと、定期実行が自動で止められる。
+  その場合は Actions の画面に出る案内から有効に戻す。
+
 ### 2. アプリを手に入れる
 
 このリポジトリに変更を push すると、GitHub Actions が全端末向けをビルドする。

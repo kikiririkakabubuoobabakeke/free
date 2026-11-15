@@ -1,0 +1,39 @@
+name: Supabaseを起こしておく
+
+# Supabase の無料プロジェクトは、しばらく使われないと一時停止される。
+# 日記を書かない日が続いても止まらないよう、毎日1回データベースに問い合わせる。
+on:
+  schedule:
+    - cron: "17 19 * * *" # 毎日 日本時間4時17分ごろ（GitHubの都合で遅れることがある）
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    name: データベースに問い合わせる
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 問い合わせ
+        env:
+          # ビルドに使うのと同じ登録値（Settings → Secrets and variables → Actions → Variables）
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "::warning::SUPABASE_URL と SUPABASE_ANON_KEY が未登録のため、何もしていません。READMEの「Supabaseを止めないために」を参照。"
+            exit 0
+          fi
+          # 未ログインの立場で records 表を1件だけ読む。行は自分にしか見えない設定なので、
+          # 返るのは空の一覧だが、問い合わせ自体はデータベースまで届く。
+          status="$(curl -sS -o body.txt -w '%{http_code}' --max-time 30 --retry 3 --retry-delay 10 --retry-all-errors \
+            "${SUPABASE_URL%/}/rest/v1/records?select=id&limit=1" \
+            -H "apikey: $SUPABASE_ANON_KEY" -H "Authorization: Bearer $SUPABASE_ANON_KEY")" || status="接続失敗"
+          if [ "$status" = "200" ]; then
+            echo "データベースが応答しました。"
+            exit 0
+          fi
+          echo "::error::Supabase が正常に応答しませんでした（$status）。すでに一時停止されている場合は、Supabase の管理画面から再開してください。"
+          head -c 500 body.txt 2>/dev/null || true
+          exit 1
