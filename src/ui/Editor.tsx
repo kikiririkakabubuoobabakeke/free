@@ -52,6 +52,11 @@ function EditorBody(props: { entry: EntryDetail; allTags: TagInfo[]; templates: 
     };
   }, [entry.id, repo]);
 
+  // 別の日記を開いたら、先頭から表示する
+  useEffect(() => {
+    document.querySelector(".main")?.scrollTo(0, 0);
+  }, [entry.id]);
+
   const remove = async () => {
     state.current.deleted = true;
     await repo.deleteEntry(entry.id);
@@ -178,9 +183,32 @@ function EditorBody(props: { entry: EntryDetail; allTags: TagInfo[]; templates: 
   );
 }
 
-function Photo(props: { id: string; hasData: boolean; onOpen: () => void }) {
+/** 一度読んだ画像は覚えておく。日記を1文字保存するたびに、数百KBの画像を読み直さないため。 */
+const imageCache = new Map<string, string>();
+
+function useAttachmentUrl(id: string, hasData: boolean): string | null | undefined {
   const { repo } = getApp();
-  const url = useQuery(() => repo.getAttachmentUrl(props.id), [props.id, props.hasData]);
+  const [url, setUrl] = useState<string | null | undefined>(imageCache.get(id));
+  useEffect(() => {
+    const cached = imageCache.get(id);
+    if (cached) {
+      setUrl(cached);
+      return;
+    }
+    let alive = true;
+    void repo.getAttachmentUrl(id).then((result) => {
+      if (result) imageCache.set(id, result);
+      if (alive) setUrl(result);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [id, hasData, repo]);
+  return url;
+}
+
+function Photo(props: { id: string; hasData: boolean; onOpen: () => void }) {
+  const url = useAttachmentUrl(props.id, props.hasData);
   if (!url) return <div className="photo waiting">{url === null ? "同期待ち" : ""}</div>;
   return (
     <button type="button" className="photo" onClick={props.onOpen} aria-label="写真を大きく表示">
@@ -190,8 +218,7 @@ function Photo(props: { id: string; hasData: boolean; onOpen: () => void }) {
 }
 
 function Lightbox(props: { id: string; onClose: () => void; onRemove: () => void }) {
-  const { repo } = getApp();
-  const url = useQuery(() => repo.getAttachmentUrl(props.id), [props.id]);
+  const url = useAttachmentUrl(props.id, true);
   return (
     <div className="lightbox" onClick={props.onClose}>
       {url && <img src={url} alt="" />}

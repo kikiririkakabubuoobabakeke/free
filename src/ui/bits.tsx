@@ -15,8 +15,12 @@ export function AutoTextarea(props: TextareaHTMLAttributes<HTMLTextAreaElement> 
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
+    // 高さを測るために一度縮めると、長文ではページが縮んでスクロール位置が飛ぶ。測る前の位置に戻す。
+    const scroller = el.closest(".main");
+    const top = scroller?.scrollTop ?? 0;
     el.style.height = "auto";
     el.style.height = `${el.scrollHeight}px`;
+    if (scroller) scroller.scrollTop = top;
   }, [props.value]);
   return <textarea ref={ref} rows={1} {...props} />;
 }

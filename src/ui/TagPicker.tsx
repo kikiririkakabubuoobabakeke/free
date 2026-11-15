@@ -87,6 +87,8 @@ export function TagPicker(props: {
               setOpen(true);
             }}
             onFocus={() => setOpen(true)}
+            // タグを付けた直後など、フォーカスが入ったままでも押し直せば候補が開く
+            onClick={() => setOpen(true)}
             onBlur={() => setOpen(false)}
             onKeyDown={(e) => {
               // 日本語変換の確定のEnterでは追加しない

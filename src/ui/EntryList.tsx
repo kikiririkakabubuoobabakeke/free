@@ -9,6 +9,8 @@ import { getApp, useQuery, useSyncState } from "./store";
 import { TagChip } from "./TagPicker";
 import { tagTree } from "./tagTree";
 
+const PAGE = 300;
+
 export async function newEntry(): Promise<void> {
   const id = await getApp().repo.createEntry(today());
   freshEntries.add(id);
@@ -19,9 +21,10 @@ export function EntryList({ activeId }: { activeId: string | null }) {
   const { repo } = getApp();
   const filter = useFilter();
   const [showTags, setShowTags] = useState(false);
+  const [limit, setLimit] = useState(PAGE);
   const entries = useQuery(
-    () => repo.listEntries({ query: filter.query, tagIds: filter.tagIds }),
-    [filter.query, filter.tagIds.join(",")],
+    () => repo.listEntries({ query: filter.query, tagIds: filter.tagIds, limit }),
+    [filter.query, filter.tagIds.join(","), limit],
   );
   const allTags = useQuery(() => repo.listTags(), []) ?? [];
   const selected = allTags.filter((t) => filter.tagIds.includes(t.id));
@@ -103,6 +106,11 @@ export function EntryList({ activeId }: { activeId: string | null }) {
             ))}
           </section>
         ))}
+        {entries !== undefined && entries.length >= limit && (
+          <button type="button" className="btn more" onClick={() => setLimit(limit + PAGE)}>
+            もっと前の日記を表示
+          </button>
+        )}
       </div>
     </aside>
   );
