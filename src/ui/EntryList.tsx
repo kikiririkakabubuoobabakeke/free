@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { SYNC_ENABLED } from "../config";
 import type { EntrySummary } from "../db/types";
 import { today } from "../db/util";
 import { freshEntries } from "./Editor";
@@ -45,7 +46,7 @@ export function EntryList({ activeId }: { activeId: string | null }) {
     <aside className="sidebar">
       <header className="sidebar-head">
         <h1>日記</h1>
-        <SyncBadge />
+        {SYNC_ENABLED && <SyncBadge />}
         <nav>
           <button type="button" className="btn ghost small" onClick={() => go("tags")}>
             タグ

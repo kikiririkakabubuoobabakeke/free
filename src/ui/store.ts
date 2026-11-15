@@ -2,12 +2,13 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { openDriver } from "../db/driver";
 import { Repo } from "../db/repo";
 import { migrate } from "../db/schema";
-import { SyncController, type SyncState } from "../sync/controller";
+import type { SyncController, SyncState } from "../sync/controller";
 
 /** 画面全体で共有するもの。起動時に1度だけ作る。 */
 export interface App {
   repo: Repo;
-  sync: SyncController;
+  /** オフライン版では null */
+  sync: SyncController | null;
 }
 
 let app: App | null = null;
@@ -23,14 +24,21 @@ export async function startApp(): Promise<App> {
   if (app) return app;
   const db = await openDriver();
   await migrate(db);
-  const sync = new SyncController(db, bump);
+  // オフライン版には同期のコード（Supabaseのライブラリを含む）を入れない。
+  // 条件をここに直接書いているのは、ビルド時に「絶対に通らない分岐」と分かるようにして丸ごと削らせるため
+  // （config.ts の SYNC_ENABLED と同じ条件）。
+  let sync: SyncController | null = null;
+  if (import.meta.env.VITE_SYNC === "on") {
+    const { SyncController } = await import("../sync/controller");
+    sync = new SyncController(db, bump);
+  }
   const repo = new Repo(db, () => {
     bump();
-    sync.requestSync();
+    sync?.requestSync();
   });
   app = { repo, sync };
   // 同期の準備は通信を伴うことがあるので、画面を出すのを待たせない
-  void sync.init();
+  void sync?.init();
   return app;
 }
 
@@ -64,8 +72,15 @@ export function useQuery<T>(load: () => Promise<T>, deps: unknown[]): T | undefi
   return data;
 }
 
-export function useSyncState(): SyncState {
+/** 同期つきの版でだけ使える */
+export function getSync(): SyncController {
   const { sync } = getApp();
+  if (!sync) throw new Error("この版には同期の機能がありません");
+  return sync;
+}
+
+export function useSyncState(): SyncState {
+  const sync = getSync();
   return useSyncExternalStore(sync.subscribe, sync.getState);
 }
 

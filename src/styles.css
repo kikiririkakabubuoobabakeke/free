@@ -983,6 +983,20 @@ textarea.input {
   background: var(--surface);
 }
 
+.path {
+  display: block;
+  max-width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--raised);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+  user-select: all;
+  -webkit-user-select: all;
+}
+
 .card h2 {
   font-size: 15px;
 }

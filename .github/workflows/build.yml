@@ -24,8 +24,10 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  # 同期先をアプリに埋め込む（任意）。設定しておくと、端末ごとに入力しなくて済む。
-  # リポジトリの Settings → Secrets and variables → Actions → Variables に登録する。
+  # 既定では同期なしのオフライン版を作る。同期つきの版にするには、
+  # リポジトリの Settings → Secrets and variables → Actions → Variables に SYNC = on を登録する。
+  VITE_SYNC: ${{ vars.SYNC }}
+  # 同期先をアプリに埋め込む（任意・同期つきの版のみ）。設定しておくと、端末ごとに入力しなくて済む。
   VITE_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
   VITE_SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
 
