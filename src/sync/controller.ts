@@ -118,14 +118,14 @@ export class SyncController {
   async signIn(email: string, password: string): Promise<string | null> {
     if (!this.client) return "接続先が未設定です";
     const { error } = await this.client.auth.signInWithPassword({ email, password });
-    return error ? error.message : null;
+    return error ? explain(error.message) : null;
   }
 
   /** 成功なら null。確認メールが必要な設定のときは、その旨を返す。 */
   async signUp(email: string, password: string): Promise<string | null> {
     if (!this.client) return "接続先が未設定です";
     const { data, error } = await this.client.auth.signUp({ email, password });
-    if (error) return error.message;
+    if (error) return explain(error.message);
     if (!data.session) return "確認メールを送りました。メール内のリンクを開いてから、ログインしてください。";
     return null;
   }
@@ -174,5 +174,20 @@ export class SyncController {
 }
 
 function message(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  return explain(error instanceof Error ? error.message : String(error));
+}
+
+/** よく出る英語のエラーを、何をすればよいか分かる日本語にする。知らないものは原文のまま出す。 */
+function explain(text: string): string {
+  if (/invalid login credentials/i.test(text)) return "メールアドレスかパスワードが違います。";
+  if (/email not confirmed/i.test(text)) return "メールアドレスの確認がまだです。届いたメールのリンクを開いてください。";
+  if (/already registered/i.test(text)) return "このメールアドレスは登録済みです。「ログイン」を押してください。";
+  if (/signups? (are |is )?(not allowed|disabled)/i.test(text)) return "この接続先では新規登録が止められています。";
+  if (/failed to fetch|load failed|networkerror|network request failed/i.test(text)) {
+    return "接続できませんでした。電波の状態と、接続先のURLを確かめてください。";
+  }
+  if (/relation .*records.* does not exist|could not find the table/i.test(text)) {
+    return "同期先の準備がまだです。supabase/schema.sql を SQL Editor で実行してください。";
+  }
+  return text;
 }

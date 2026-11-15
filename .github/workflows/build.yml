@@ -169,14 +169,17 @@ jobs:
       - name: 署名なしでビルド
         run: |
           # 署名は入れる側（SideStore や AltStore）が自分のApple IDで行うので、ここでは付けない。
-          npm run build
-          project="$(ls -d src-tauri/gen/apple/*.xcodeproj)"
-          scheme="$(xcodebuild -list -json -project "$project" | jq -r '.project.schemes[0]')"
-          xcodebuild build -project "$project" -scheme "$scheme" -configuration release \
-            -sdk iphoneos -arch arm64 -derivedDataPath "$RUNNER_TEMP/derived" \
-            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
+          # Xcodeの全ビルドに「署名しない」設定を上書きで効かせる。
+          printf '%s\n' 'CODE_SIGNING_ALLOWED = NO' 'CODE_SIGNING_REQUIRED = NO' \
+            'CODE_SIGN_IDENTITY =' 'CODE_SIGN_ENTITLEMENTS =' > "$RUNNER_TEMP/unsigned.xcconfig"
+          export XCODE_XCCONFIG_FILE="$RUNNER_TEMP/unsigned.xcconfig"
+          # 最後の「書き出し」の段階は署名が無いと失敗するが、その手前でアプリ本体はできている。
+          npx tauri ios build --target aarch64 || echo "::notice::書き出しの段階の失敗は想定どおり（署名なしのため）"
+          app="$(find src-tauri/gen/apple -type d -path '*.xcarchive/Products/Applications/*.app' | head -1)"
+          if [ -z "$app" ]; then echo "::error::アプリ本体ができていません"; exit 1; fi
+          lipo -info "$app/$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Info.plist")"
           mkdir Payload
-          cp -R "$RUNNER_TEMP"/derived/Build/Products/release-iphoneos/*.app Payload/
+          cp -R "$app" Payload/
           zip -qr nikki.ipa Payload
       - uses: actions/upload-artifact@v4
         with:
