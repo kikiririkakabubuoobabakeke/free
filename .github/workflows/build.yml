@@ -18,9 +18,10 @@ on:
       - "tsconfig.json"
       - ".github/workflows/build.yml"
 
+# 同じブランチのビルドは1つずつ。続けてpushしたときは、進行中のものを止めずに、最新の1件だけが順番を待つ。
 concurrency:
   group: build-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
   # 同期先をアプリに埋め込む（任意）。設定しておくと、端末ごとに入力しなくて済む。
@@ -169,10 +170,10 @@ jobs:
       - name: 署名なしでビルド
         run: |
           # 署名は入れる側（SideStore や AltStore）が自分のApple IDで行うので、ここでは付けない。
-          # Xcodeの全ビルドに「署名しない」設定を上書きで効かせる。
-          printf '%s\n' 'CODE_SIGNING_ALLOWED = NO' 'CODE_SIGNING_REQUIRED = NO' \
-            'CODE_SIGN_IDENTITY =' 'CODE_SIGN_ENTITLEMENTS =' > "$RUNNER_TEMP/unsigned.xcconfig"
-          export XCODE_XCCONFIG_FILE="$RUNNER_TEMP/unsigned.xcconfig"
+          # 生成されたXcodeプロジェクトの全ビルド設定に「署名しない」を書き足す。
+          perl -pi -e 's/buildSettings = \{/buildSettings = { CODE_SIGNING_ALLOWED = NO; CODE_SIGNING_REQUIRED = NO;/' \
+            src-tauri/gen/apple/*.xcodeproj/project.pbxproj
+          grep -c "CODE_SIGNING_ALLOWED = NO" src-tauri/gen/apple/*.xcodeproj/project.pbxproj
           # 最後の「書き出し」の段階は署名が無いと失敗するが、その手前でアプリ本体はできている。
           npx tauri ios build --target aarch64 || echo "::notice::書き出しの段階の失敗は想定どおり（署名なしのため）"
           app="$(find src-tauri/gen/apple -type d -path '*.xcarchive/Products/Applications/*.app' | head -1)"
