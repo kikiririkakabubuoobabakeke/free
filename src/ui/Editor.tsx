@@ -43,8 +43,14 @@ function EditorBody(props: { entry: EntryDetail; allTags: TagInfo[]; templates: 
 
   // 作ったばかりで何も書かれていないエントリは、離れるときに消す
   const state = useRef({ empty: true, deleted: false });
+  // 日付を付けただけでも、自分で手を入れたものなので「空」とは扱わない
   state.current.empty =
-    !title.trim() && !body.trim() && !entry.tags.length && !entry.structures.length && !entry.attachments.length;
+    !title.trim() &&
+    !body.trim() &&
+    !entry.date &&
+    !entry.tags.length &&
+    !entry.structures.length &&
+    !entry.attachments.length;
   useEffect(() => {
     const current = state.current;
     return () => {
