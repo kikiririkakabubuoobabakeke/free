@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { toDateString } from "../src/db/util";
 import { openTestDb } from "./helpers";
 
 describe("エントリ", () => {
@@ -229,5 +230,102 @@ describe("同時の保存", () => {
     const [a, b] = await Promise.all([repo.findOrCreateTag("同時"), repo.findOrCreateTag("同時")]);
     expect(a!.id).toBe(b!.id);
     expect(await repo.listTags()).toHaveLength(1);
+  });
+});
+
+describe("3つの日時（日付・作成・最終更新）", () => {
+  const tick = () => new Promise((r) => setTimeout(r, 3));
+
+  it("日付を付けずに作ると日付は空で、作成した日の位置に並ぶ", async () => {
+    // 端末の日付とUTCの日付が食い違う時間帯にして、端末の時間帯で数えていることを確かめる
+    const before = process.env.TZ;
+    process.env.TZ = new Date().getUTCHours() >= 10 ? "Pacific/Kiritimati" : "Etc/GMT+12";
+    try {
+      const { repo } = await openTestDb();
+      const id = await repo.createEntry();
+      const entry = (await repo.getEntry(id))!;
+      const localDay = toDateString(new Date(entry.created_at));
+      expect(localDay).not.toBe(new Date(entry.created_at).toISOString().slice(0, 10));
+      expect(entry.date).toBe("");
+      expect(entry.day).toBe(localDay);
+      expect((await repo.listEntries())[0].day).toBe(localDay);
+    } finally {
+      process.env.TZ = before;
+    }
+  });
+
+  it("明示的に付けた日付があれば、その日の位置に並ぶ。外すと作成日に戻る", async () => {
+    const { repo } = await openTestDb();
+    const plain = await repo.createEntry();
+    const past = await repo.createEntry();
+    const future = await repo.createEntry();
+    await repo.updateEntry(past, { date: "2020-01-01" });
+    await repo.updateEntry(future, { date: "2099-12-31" });
+    const order = async () => (await repo.listEntries()).map((e) => e.id);
+    expect(await order()).toEqual([future, plain, past]);
+    expect((await repo.getEntry(past))!.day).toBe("2020-01-01");
+
+    await repo.updateEntry(past, { date: "" });
+    const entry = (await repo.getEntry(past))!;
+    expect(entry.date).toBe("");
+    expect(entry.day).toBe(toDateString(new Date(entry.created_at)));
+    // 日付なし同士は、作成が新しい方が先
+    expect(await order()).toEqual([future, past, plain]);
+  });
+
+  it("作成の時刻は、何を変えても動かない", async () => {
+    const { repo } = await openTestDb();
+    const id = await repo.createEntry();
+    const created = (await repo.getEntry(id))!.created_at;
+    await tick();
+    await repo.updateEntry(id, { title: "題", body: "本文", date: "2021-05-05" });
+    const s = await repo.addBlankStructure(id, "構造");
+    await repo.removeStructure(s);
+    expect((await repo.getEntry(id))!.created_at).toBe(created);
+  });
+
+  it("最終更新は、本文だけでなく構造・タグ・写真・日付の変更でも進む", async () => {
+    const { repo } = await openTestDb();
+    const id = await repo.createEntry();
+    const other = await repo.createEntry();
+    let last = (await repo.getEntry(id))!.edited_at;
+    expect(last).toBe((await repo.getEntry(id))!.created_at);
+
+    const advanced = async (what: string) => {
+      const now = (await repo.getEntry(id))!.edited_at;
+      expect(now, what).toBeGreaterThan(last);
+      last = now;
+      await tick();
+    };
+    await tick();
+    await repo.updateEntry(id, { body: "書いた" });
+    await advanced("本文");
+    await repo.updateEntry(id, { date: "2022-02-02" });
+    await advanced("日付");
+    const s = await repo.addBlankStructure(id, "体調");
+    await advanced("構造を付ける");
+    await repo.updateStructure(s, { fields: [{ id: "a", label: "A", type: "text" }], values: { a: "x" } });
+    await advanced("構造の値");
+    const tag = (await repo.findOrCreateTag("タグ"))!;
+    await repo.setTagLinked("structure", s, tag.id, true);
+    await advanced("構造のタグ");
+    await repo.setTagLinked("entry", id, tag.id, true);
+    await advanced("日記のタグ");
+    await repo.setTagLinked("entry", id, tag.id, false);
+    await advanced("タグを外す");
+    const photo = await repo.addAttachment(id, { mime: "image/jpeg", width: 1, height: 1, data: "QUJD" });
+    await advanced("写真を付ける");
+    await repo.removeAttachment(photo);
+    await advanced("写真を外す");
+    await repo.removeStructure(s);
+    await advanced("構造を外す");
+
+    // 別の日記を変えても、この日記の最終更新は動かない
+    await repo.updateEntry(other, { body: "別の日記" });
+    await repo.setTagLinked("entry", other, tag.id, true);
+    expect((await repo.getEntry(id))!.edited_at).toBe(last);
+    // 開いて読むだけでも動かない
+    await repo.listEntries();
+    expect((await repo.getEntry(id))!.edited_at).toBe(last);
   });
 });

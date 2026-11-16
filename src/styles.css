@@ -598,23 +598,37 @@ textarea.input {
   flex-wrap: wrap;
 }
 
-.date-picker {
-  display: inline-flex;
+.dates {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
+  gap: 2px 14px;
+  margin: 0;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 13px;
 }
 
-.date-picker input {
+.dates dt {
+  white-space: nowrap;
+}
+
+.dates dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  min-height: 30px;
+  margin: 0;
+}
+
+.dates input {
   min-height: 30px;
   padding: 2px 6px;
   border: 1px solid var(--line);
   border-radius: 6px;
   background: transparent;
   font-size: 13px;
-  color: var(--muted);
+  color: var(--text);
 }
 
 .title-input,

@@ -29,6 +29,26 @@ interface StructureRow {
 const EXCERPT_LENGTH = 160;
 
 /**
+ * 一覧で並べるときの日。明示的に付けた日付があればそれ、無ければ作成した日。
+ * 作成した日は、端末の時間帯での日付にする（夜中に書いたものが前後の日にずれないように）。
+ */
+const DAY = `CASE WHEN e.date <> '' THEN e.date
+  ELSE strftime('%Y-%m-%d', e.created_at / 1000, 'unixepoch', 'localtime') END`;
+
+/**
+ * 最終更新。エントリの行そのものに加え、そこに付いた構造・写真・タグ付けのうち、最後に変わった時刻。
+ * 外した構造や写真も「変更」なので、削除済みの行も含めて見る。
+ */
+const EDITED_AT = `max(
+  e.updated_at,
+  coalesce((SELECT max(s.updated_at) FROM structures s WHERE s.entry_id = e.id), 0),
+  coalesce((SELECT max(a.updated_at) FROM attachments a WHERE a.entry_id = e.id), 0),
+  coalesce((SELECT max(l.updated_at) FROM tag_links l WHERE
+    (l.target_type = 'entry' AND l.target_id = e.id) OR
+    (l.target_type = 'structure' AND l.target_id IN (SELECT s.id FROM structures s WHERE s.entry_id = e.id))), 0)
+)`;
+
+/**
  * 日記データへの操作をまとめた層。画面はここだけを通して読み書きする。
  * 変更系の操作は updated_at を進めて dirty=1 にし、onChange を呼ぶ（同期と画面更新の合図）。
  */
@@ -52,7 +72,8 @@ export class Repo {
 
   // ---------------------------------------------------------------- エントリ
 
-  async createEntry(date: string): Promise<string> {
+  /** 日記を作る。date は明示的に付ける日付で、省けば「付けていない」状態になる。 */
+  async createEntry(date = ""): Promise<string> {
     const id = uid();
     const t = now();
     await this.db.run(
@@ -103,8 +124,9 @@ export class Repo {
   }
 
   async getEntry(id: string): Promise<EntryDetail | null> {
-    const rows = await this.db.all<Entry>(
-      `SELECT id, date, title, body, created_at, updated_at FROM entries WHERE id = ? AND deleted = 0`,
+    const rows = await this.db.all<Entry & { edited_at: number }>(
+      `SELECT e.id, e.date, ${DAY} AS day, e.title, e.body, e.created_at, e.updated_at, ${EDITED_AT} AS edited_at
+       FROM entries e WHERE e.id = ? AND e.deleted = 0`,
       [id],
     );
     if (!rows.length) return null;
@@ -166,9 +188,10 @@ export class Repo {
     }
 
     const entries = await this.db.all<Entry>(
-      `SELECT e.id, e.date, e.title, substr(e.body, 1, ${EXCERPT_LENGTH}) AS body, e.created_at, e.updated_at
+      `SELECT e.id, e.date, ${DAY} AS day, e.title, substr(e.body, 1, ${EXCERPT_LENGTH}) AS body,
+              e.created_at, e.updated_at
        FROM entries e WHERE ${where.join(" AND ")}
-       ORDER BY e.date DESC, e.created_at DESC LIMIT ?`,
+       ORDER BY day DESC, e.created_at DESC LIMIT ?`,
       [...params, opts.limit ?? 500],
     );
 

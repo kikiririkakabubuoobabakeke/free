@@ -149,3 +149,32 @@ describe("同期", () => {
     expect(await pc.repo.getEntry(e)).not.toBeNull();
   });
 });
+
+describe("3つの日時の同期", () => {
+  it("日付・作成・最終更新が、もう片方の端末でも同じ値になる", async () => {
+    const remote = new FakeRemote();
+    const pc = await openTestDb();
+    const phone = await openTestDb();
+    const dated = await pc.repo.createEntry();
+    await pc.repo.updateEntry(dated, { date: "2024-03-03", body: "日付つき" });
+    const plain = await pc.repo.createEntry();
+    await tick();
+    const s = await pc.repo.addBlankStructure(plain, "体調");
+    await tick();
+    await pc.repo.setTagLinked("structure", s, (await pc.repo.findOrCreateTag("健康"))!.id, true);
+
+    await syncOnce(pc.db, remote);
+    await syncOnce(phone.db, remote);
+    for (const id of [dated, plain]) {
+      const a = (await pc.repo.getEntry(id))!;
+      const b = (await phone.repo.getEntry(id))!;
+      expect(b.date).toBe(a.date);
+      expect(b.day).toBe(a.day);
+      expect(b.created_at).toBe(a.created_at);
+      expect(b.edited_at).toBe(a.edited_at);
+    }
+    expect((await phone.repo.getEntry(plain))!.date).toBe("");
+    // 受け取っただけでは最終更新は進まない（構造のタグ付けの時刻のまま）
+    expect((await phone.repo.getEntry(plain))!.edited_at).toBeGreaterThan((await phone.repo.getEntry(plain))!.created_at);
+  });
+});

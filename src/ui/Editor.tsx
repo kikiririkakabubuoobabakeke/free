@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { EntryDetail, TagInfo, Template } from "../db/types";
 import { AutoTextarea, ConfirmButton, toast } from "./bits";
-import { dayOf } from "./format";
+import { dayOf, formatDateTime } from "./format";
 import { prepareImage } from "./image";
 import { go, goBack } from "./router";
 import { getApp, useDraft, useQuery } from "./store";
@@ -80,18 +80,36 @@ function EditorBody(props: { entry: EntryDetail; allTags: TagInfo[]; templates: 
         <button type="button" className="btn ghost back" onClick={goBack}>
           ‹ 一覧
         </button>
-        <label className="date-picker">
+        <span className="spacer" />
+        <ConfirmButton label="削除" confirmLabel="この日記を削除" onConfirm={() => void remove()} />
+      </header>
+
+      {/* 日時は3つ。日付は自分で付けるもの、作成と最終更新は自動で入るもの。 */}
+      <dl className="dates">
+        <dt>日付</dt>
+        <dd>
           <input
             type="date"
             value={entry.date}
             aria-label="日付"
-            onChange={(e) => e.target.value && void repo.updateEntry(entry.id, { date: e.target.value })}
+            onChange={(e) => void repo.updateEntry(entry.id, { date: e.target.value })}
           />
-          <span>{dayOf(entry.date).weekday}曜日</span>
-        </label>
-        <span className="spacer" />
-        <ConfirmButton label="削除" confirmLabel="この日記を削除" onConfirm={() => void remove()} />
-      </header>
+          {entry.date ? (
+            <>
+              <span>{dayOf(entry.date).weekday}曜日</span>
+              <button type="button" className="btn ghost small" onClick={() => void repo.updateEntry(entry.id, { date: "" })}>
+                外す
+              </button>
+            </>
+          ) : (
+            <span className="hint">付けていません（作成日の位置に並びます）</span>
+          )}
+        </dd>
+        <dt>作成</dt>
+        <dd>{formatDateTime(entry.created_at)}</dd>
+        <dt>最終更新</dt>
+        <dd>{formatDateTime(entry.edited_at)}</dd>
+      </dl>
 
       <input className="title-input" value={title} placeholder="題（なくてもよい）" aria-label="題" onChange={(e) => setTitle(e.target.value)} />
       <AutoTextarea

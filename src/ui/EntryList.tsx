@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { SYNC_ENABLED } from "../config";
 import type { EntrySummary } from "../db/types";
-import { today } from "../db/util";
+import { toDateString } from "../db/util";
 import { freshEntries } from "./Editor";
 import { setFilter, useFilter } from "./filter";
 import { dayOf, formatMonth, formatTime } from "./format";
@@ -13,7 +13,8 @@ import { tagTree } from "./tagTree";
 const PAGE = 300;
 
 export async function newEntry(): Promise<void> {
-  const id = await getApp().repo.createEntry(today());
+  // 日付は付けずに作る。作成した時刻は自動で入り、日付は必要なときに編集画面で付ける。
+  const id = await getApp().repo.createEntry();
   freshEntries.add(id);
   go(`e/${id}`);
 }
@@ -37,7 +38,7 @@ export function EntryList({ activeId }: { activeId: string | null }) {
   // 月ごとにまとめる
   const months: { month: string; items: EntrySummary[] }[] = [];
   for (const entry of entries ?? []) {
-    const month = formatMonth(entry.date);
+    const month = formatMonth(entry.day);
     if (months[months.length - 1]?.month !== month) months.push({ month, items: [] });
     months[months.length - 1].items.push(entry);
   }
@@ -118,7 +119,8 @@ export function EntryList({ activeId }: { activeId: string | null }) {
 }
 
 function EntryRow({ entry, active }: { entry: EntrySummary; active: boolean }) {
-  const { day, weekday } = dayOf(entry.date);
+  const { day, weekday } = dayOf(entry.day);
+  const created = new Date(entry.created_at);
   const firstLine = entry.body.split("\n").find((line) => line.trim()) ?? "";
   const heading = entry.title.trim() || firstLine || "（まだ何も書かれていません）";
   const rest = entry.title.trim() ? entry.body : entry.body.slice(entry.body.indexOf(firstLine) + firstLine.length);
@@ -132,7 +134,10 @@ function EntryRow({ entry, active }: { entry: EntrySummary; active: boolean }) {
         <span className="entry-title">{heading}</span>
         {rest.trim() && <span className="entry-excerpt">{rest.trim()}</span>}
         <span className="entry-meta">
-          <span className="hint">{formatTime(entry.created_at)}</span>
+          {/* 左の日は「並べる日」。付けた日付が作成した日と違うときは、時刻だけだと紛らわしいので作成日を添える */}
+          <span className="hint">
+            {entry.day === toDateString(created) ? formatTime(entry.created_at) : `${created.getMonth() + 1}/${created.getDate()} に作成`}
+          </span>
           {entry.tags.map((tag) => (
             <TagChip key={tag.id} tag={tag} />
           ))}

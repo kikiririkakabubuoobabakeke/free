@@ -15,6 +15,13 @@ export function dayOf(date: string): { day: number; weekday: string } {
   return { day: d, weekday: w };
 }
 
+/** 時刻つきの日時。例: 2026年11月15日（日）8:08 */
+export function formatDateTime(ms: number): string {
+  const d = new Date(ms);
+  const w = WEEKDAYS[d.getDay()];
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日（${w}）${formatTime(ms)}`;
+}
+
 export function formatTime(ms: number): string {
   const d = new Date(ms);
   return `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;

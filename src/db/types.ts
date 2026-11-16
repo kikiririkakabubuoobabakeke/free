@@ -21,13 +21,23 @@ export interface FieldDef {
 export type FieldValue = string | number | boolean | null;
 export type FieldValues = Record<string, FieldValue>;
 
+/**
+ * 日記の日時は3つある。
+ * - date: 自分で明示的に付ける日付（「これは何日の日記か」）。付けなければ空。
+ * - created_at: 作成した時刻。自動で入り、後から変わらない。
+ * - 最終更新: 自動で進む。本文だけでなく構造・タグ・写真の変更も含めた値は EntryDetail.edited_at。
+ */
 export interface Entry {
   id: string;
-  /** YYYY-MM-DD */
+  /** 明示的に付けた日付（YYYY-MM-DD）。付けていなければ空文字。 */
   date: string;
+  /** 一覧で並べるときの日（YYYY-MM-DD）。date があればそれ、無ければ作成した日。 */
+  day: string;
   title: string;
   body: string;
+  /** 作成した時刻（ミリ秒） */
   created_at: number;
+  /** エントリの行そのもの（日付・題・本文）を最後に変えた時刻。同期の新旧判定に使う。 */
   updated_at: number;
 }
 
@@ -74,6 +84,8 @@ export interface AttachmentMeta {
 }
 
 export interface EntryDetail extends Entry {
+  /** 最終更新。日付・題・本文に加えて、構造・タグ・写真の変更も含めた最後の時刻（ミリ秒）。 */
+  edited_at: number;
   tags: Tag[];
   structures: Structure[];
   attachments: AttachmentMeta[];
