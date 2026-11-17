@@ -2,12 +2,22 @@ import { useMemo, useState, type CSSProperties } from "react";
 import type { Tag, TagInfo } from "../db/types";
 import { getApp } from "./store";
 
+/** 色を、明るさを保った灰色にする（前の版で付けた色付きのタグもモノトーンで見せるため） */
+export function toGray(color: string): string {
+  const m = /^#([0-9a-f]{6})$/i.exec(color);
+  if (!m) return "#7f7f7f";
+  const n = parseInt(m[1], 16);
+  const y = Math.round(0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255));
+  const h = y.toString(16).padStart(2, "0");
+  return `#${h}${h}${h}`;
+}
+
 export function TagChip(props: { tag: Tag; onRemove?: () => void; onClick?: () => void; active?: boolean }) {
   const { tag } = props;
   return (
     <span
       className={`chip${props.active ? " active" : ""}${props.onClick ? " clickable" : ""}`}
-      style={{ "--chip": tag.color || "#8a8f98" } as CSSProperties}
+      style={{ "--chip": toGray(tag.color) } as CSSProperties}
       onClick={props.onClick}
     >
       <span className="chip-dot" />
@@ -39,6 +49,8 @@ export function TagPicker(props: {
   onAdd: (tag: Tag) => void;
   onRemove: (tag: Tag) => void;
   placeholder?: string;
+  /** 付け外しをさせず、付いているタグを見せるだけにする */
+  readOnly?: boolean;
 }) {
   const { repo } = getApp();
   const [text, setText] = useState("");
@@ -63,6 +75,17 @@ export function TagPicker(props: {
     }
     return [...ids].filter((id) => !attached.has(id) && byId.has(id)).map((id) => byId.get(id)!);
   }, [props.allTags, props.tags, attached]);
+
+  if (props.readOnly) {
+    if (!props.tags.length) return null;
+    return (
+      <div className="tag-row">
+        {props.tags.map((tag) => (
+          <TagChip key={tag.id} tag={tag} />
+        ))}
+      </div>
+    );
+  }
 
   const submit = async (name: string) => {
     const tag = await repo.findOrCreateTag(name);

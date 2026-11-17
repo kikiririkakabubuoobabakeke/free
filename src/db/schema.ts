@@ -97,6 +97,19 @@ const MIGRATIONS: string[][] = [
     )`,
     `CREATE INDEX attachments_entry ON attachments(entry_id)`,
   ],
+  [
+    // 日記ごとの状態（ロック・ゴミ箱）。id は日記の id と同じ。
+    // 日記の行とは別に持つことで、ロックやゴミ箱への出し入れが「最終更新」を動かさないようにしている。
+    // 行が無い日記は「ロックなし・ゴミ箱に入っていない」として扱う。
+    `CREATE TABLE entry_meta (
+      id TEXT PRIMARY KEY,
+      locked INTEGER NOT NULL DEFAULT 0,
+      trashed_at INTEGER,
+      updated_at INTEGER NOT NULL,
+      deleted INTEGER NOT NULL DEFAULT 0,
+      dirty INTEGER NOT NULL DEFAULT 1
+    )`,
+  ],
 ];
 
 export async function migrate(db: Driver): Promise<void> {

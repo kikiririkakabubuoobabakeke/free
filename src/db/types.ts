@@ -39,7 +39,14 @@ export interface Entry {
   created_at: number;
   /** エントリの行そのもの（日付・題・本文）を最後に変えた時刻。同期の新旧判定に使う。 */
   updated_at: number;
+  /** ロック中は、日記の中身を何も変えられない */
+  locked: boolean;
+  /** ゴミ箱に入れた時刻（ミリ秒）。入っていなければ null。 */
+  trashed_at: number | null;
 }
+
+/** ゴミ箱に入れた日記を、自動で完全に削除するまでの日数 */
+export const TRASH_DAYS = 30;
 
 export interface Tag {
   id: string;
@@ -108,13 +115,5 @@ export interface TagInfo extends Tag {
   use_count: number;
 }
 
-export const TAG_COLORS = [
-  "#c2553f",
-  "#c98a1b",
-  "#5a8f3c",
-  "#2f8f83",
-  "#3b74c4",
-  "#7a5cc4",
-  "#b8508f",
-  "#8a8f98",
-];
+/** タグの色。モノトーンの濃淡だけ。 */
+export const TAG_COLORS = ["#1c1c1c", "#3d3d3d", "#5e5e5e", "#7f7f7f", "#a0a0a0", "#c1c1c1"];

@@ -12,6 +12,7 @@ import {
   type TagInfo,
   type TagTarget,
   type Template,
+  TRASH_DAYS,
 } from "./types";
 import { chunk, likePattern, now, parseJson, structureSearchText, uid } from "./util";
 
@@ -47,6 +48,33 @@ const EDITED_AT = `max(
     (l.target_type = 'entry' AND l.target_id = e.id) OR
     (l.target_type = 'structure' AND l.target_id IN (SELECT s.id FROM structures s WHERE s.entry_id = e.id))), 0)
 )`;
+
+/** 日記ごとの状態（ロック・ゴミ箱）。一覧などで entries e に LEFT JOIN して使う。 */
+const META_JOIN = `LEFT JOIN entry_meta m ON m.id = e.id AND m.deleted = 0`;
+const META_COLS = `coalesce(m.locked, 0) AS locked, m.trashed_at AS trashed_at`;
+
+/** タグ付け（別名 alias）が、どの日記のものか。日記か構造に付いたものだけで、テンプレのものは NULL。 */
+const linkEntry = (alias: string) => `(CASE ${alias}.target_type
+  WHEN 'entry' THEN ${alias}.target_id
+  WHEN 'structure' THEN (SELECT s2.entry_id FROM structures s2 WHERE s2.id = ${alias}.target_id)
+END)`;
+
+/** ロック中やゴミ箱の中の日記を変えようとしたときのエラー */
+export class EntryLockedError extends Error {
+  constructor(readonly reason: "locked" | "trashed") {
+    super(reason === "locked" ? "ロック中の日記は変更できません" : "ゴミ箱の中の日記は変更できません。先に元に戻してください");
+    this.name = "EntryLockedError";
+  }
+}
+
+interface EntryRow extends Omit<Entry, "locked"> {
+  locked: number;
+}
+
+const toEntry = <T extends EntryRow>(row: T): Omit<T, "locked"> & { locked: boolean } => ({
+  ...row,
+  locked: !!row.locked,
+});
 
 /**
  * 日記データへの操作をまとめた層。画面はここだけを通して読み書きする。
@@ -94,6 +122,7 @@ export class Repo {
       }
     }
     if (!sets.length) return;
+    await this.assertEditable(id);
     await this.db.run(`UPDATE entries SET ${sets.join(", ")}, updated_at = ?, dirty = 1 WHERE id = ?`, [
       ...params,
       now(),
@@ -102,8 +131,97 @@ export class Repo {
     this.onChange();
   }
 
-  /** エントリと、それに付いている構造・タグ付け・写真をまとめて削除する */
-  async deleteEntry(id: string): Promise<void> {
+  // ---------------------------------------------------------------- ロック
+
+  /**
+   * ロックする／外す。ロック中は日記の中身（日付・題・本文・構造・タグ・写真）を何も変えられず、ゴミ箱にも入れられない。
+   * ロックの付け外しそのものは、日記の「最終更新」を動かさない。
+   */
+  async setLocked(id: string, locked: boolean): Promise<void> {
+    const state = await this.entryState(id);
+    if (!state) return;
+    if (state.trashed_at !== null) throw new EntryLockedError("trashed");
+    await this.db.run(
+      `INSERT INTO entry_meta (id, locked, trashed_at, updated_at, deleted, dirty) VALUES (?, ?, NULL, ?, 0, 1)
+       ON CONFLICT(id) DO UPDATE SET locked = excluded.locked, updated_at = excluded.updated_at, deleted = 0, dirty = 1`,
+      [id, locked ? 1 : 0, now()],
+    );
+    this.onChange();
+  }
+
+  // ---------------------------------------------------------------- ゴミ箱
+
+  /**
+   * ゴミ箱に入れる。一覧や検索には出なくなるが、TRASH_DAYS 日の間は元に戻せる。中身はそのまま残る。
+   * ゴミ箱への出し入れは、日記の「最終更新」を動かさない。
+   */
+  async trashEntry(id: string): Promise<void> {
+    const state = await this.entryState(id);
+    if (!state || state.trashed_at !== null) return;
+    if (state.locked) throw new EntryLockedError("locked");
+    await this.setTrashedAt(id, now());
+  }
+
+  /** ゴミ箱から元に戻す */
+  async restoreEntry(id: string): Promise<void> {
+    const state = await this.entryState(id);
+    if (!state || state.trashed_at === null) return;
+    await this.setTrashedAt(id, null);
+  }
+
+  private async setTrashedAt(id: string, trashedAt: number | null): Promise<void> {
+    await this.db.run(
+      `INSERT INTO entry_meta (id, locked, trashed_at, updated_at, deleted, dirty) VALUES (?, 0, ?, ?, 0, 1)
+       ON CONFLICT(id) DO UPDATE SET trashed_at = excluded.trashed_at, updated_at = excluded.updated_at,
+         deleted = 0, dirty = 1`,
+      [id, trashedAt, now()],
+    );
+    this.onChange();
+  }
+
+  /** ゴミ箱の中身。新しく入れたものが先。 */
+  async listTrash(): Promise<EntrySummary[]> {
+    const rows = await this.db.all<EntryRow>(
+      `SELECT e.id, e.date, ${DAY} AS day, e.title, substr(e.body, 1, ${EXCERPT_LENGTH}) AS body,
+              e.created_at, e.updated_at, ${META_COLS}
+       FROM entries e ${META_JOIN}
+       WHERE e.deleted = 0 AND m.trashed_at IS NOT NULL
+       ORDER BY m.trashed_at DESC`,
+    );
+    return this.summarize(rows.map(toEntry));
+  }
+
+  /** ゴミ箱の中の日記を、元に戻せない形で削除する */
+  async purgeEntry(id: string): Promise<void> {
+    const state = await this.entryState(id);
+    if (!state) return;
+    if (state.locked) throw new EntryLockedError("locked");
+    await this.purgeNow(id);
+    this.onChange();
+  }
+
+  /** ゴミ箱を空にする */
+  async emptyTrash(): Promise<number> {
+    return this.purgeWhere(`m.trashed_at IS NOT NULL`, []);
+  }
+
+  /** ゴミ箱に入れてから TRASH_DAYS 日を過ぎたものを、完全に削除する。消した件数を返す。 */
+  async purgeExpiredTrash(at = Date.now()): Promise<number> {
+    return this.purgeWhere(`m.trashed_at IS NOT NULL AND m.trashed_at <= ?`, [at - TRASH_DAYS * 86_400_000]);
+  }
+
+  private async purgeWhere(condition: string, params: unknown[]): Promise<number> {
+    const rows = await this.db.all<{ id: string }>(
+      `SELECT e.id FROM entries e ${META_JOIN} WHERE e.deleted = 0 AND coalesce(m.locked, 0) = 0 AND ${condition}`,
+      params,
+    );
+    for (const r of rows) await this.purgeNow(r.id);
+    if (rows.length) this.onChange();
+    return rows.length;
+  }
+
+  /** エントリと、それに付いている構造・タグ付け・写真・状態をまとめて削除する */
+  private async purgeNow(id: string): Promise<void> {
     const t = now();
     const structures = await this.db.all<{ id: string }>(
       `SELECT id FROM structures WHERE entry_id = ? AND deleted = 0`,
@@ -119,14 +237,49 @@ export class Repo {
       `UPDATE attachments SET deleted = 1, data = NULL, updated_at = ?, dirty = 1 WHERE entry_id = ? AND deleted = 0`,
       [t, id],
     );
+    await this.db.run(`UPDATE entry_meta SET deleted = 1, updated_at = ?, dirty = 1 WHERE id = ? AND deleted = 0`, [
+      t,
+      id,
+    ]);
     await this.db.run(`UPDATE entries SET deleted = 1, updated_at = ?, dirty = 1 WHERE id = ?`, [t, id]);
-    this.onChange();
   }
 
+  // ---------------------------------------------------------------- 状態の確認
+
+  /** 日記のロックとゴミ箱の状態。日記が無ければ null。 */
+  private async entryState(id: string): Promise<{ locked: boolean; trashed_at: number | null } | null> {
+    const rows = await this.db.all<{ locked: number; trashed_at: number | null }>(
+      `SELECT ${META_COLS} FROM entries e ${META_JOIN} WHERE e.id = ? AND e.deleted = 0`,
+      [id],
+    );
+    return rows.length ? { locked: !!rows[0].locked, trashed_at: rows[0].trashed_at } : null;
+  }
+
+  /** ロック中かゴミ箱の中なら、変更を断る */
+  private async assertEditable(entryId: string): Promise<void> {
+    const state = await this.entryState(entryId);
+    if (state?.locked) throw new EntryLockedError("locked");
+    if (state && state.trashed_at !== null) throw new EntryLockedError("trashed");
+  }
+
+  private async assertStructureEditable(structureId: string): Promise<void> {
+    const rows = await this.db.all<{ entry_id: string }>(`SELECT entry_id FROM structures WHERE id = ?`, [structureId]);
+    if (rows.length) await this.assertEditable(rows[0].entry_id);
+  }
+
+  private async assertAttachmentEditable(attachmentId: string): Promise<void> {
+    const rows = await this.db.all<{ entry_id: string }>(`SELECT entry_id FROM attachments WHERE id = ?`, [attachmentId]);
+    if (rows.length) await this.assertEditable(rows[0].entry_id);
+  }
+
+  // ---------------------------------------------------------------- 読み出し
+
+  /** 日記を1件。ゴミ箱の中のものも返す（trashed_at で見分ける）。 */
   async getEntry(id: string): Promise<EntryDetail | null> {
-    const rows = await this.db.all<Entry & { edited_at: number }>(
-      `SELECT e.id, e.date, ${DAY} AS day, e.title, e.body, e.created_at, e.updated_at, ${EDITED_AT} AS edited_at
-       FROM entries e WHERE e.id = ? AND e.deleted = 0`,
+    const rows = await this.db.all<EntryRow & { edited_at: number }>(
+      `SELECT e.id, e.date, ${DAY} AS day, e.title, e.body, e.created_at, e.updated_at, ${META_COLS},
+              ${EDITED_AT} AS edited_at
+       FROM entries e ${META_JOIN} WHERE e.id = ? AND e.deleted = 0`,
       [id],
     );
     if (!rows.length) return null;
@@ -141,7 +294,7 @@ export class Repo {
     );
     const entryTags = await this.tagsFor("entry", [id]);
     return {
-      ...rows[0],
+      ...toEntry(rows[0]),
       tags: entryTags.get(id) ?? [],
       structures: structureRows.map((s) => toStructure(s, structureTags.get(s.id) ?? [])),
       attachments: await this.listAttachments(id),
@@ -155,7 +308,7 @@ export class Repo {
    * タグはエントリ自体に付いたものと、そのエントリの構造に付いたものの両方を見る。
    */
   async listEntries(opts: { query?: string; tagIds?: string[]; limit?: number } = {}): Promise<EntrySummary[]> {
-    const where: string[] = [`e.deleted = 0`];
+    const where: string[] = [`e.deleted = 0`, `m.trashed_at IS NULL`];
     const params: unknown[] = [];
 
     // このエントリ、またはその構造に付いたタグ付けを探す部分
@@ -187,14 +340,18 @@ export class Repo {
       }
     }
 
-    const entries = await this.db.all<Entry>(
+    const entries = await this.db.all<EntryRow>(
       `SELECT e.id, e.date, ${DAY} AS day, e.title, substr(e.body, 1, ${EXCERPT_LENGTH}) AS body,
-              e.created_at, e.updated_at
-       FROM entries e WHERE ${where.join(" AND ")}
+              e.created_at, e.updated_at, ${META_COLS}
+       FROM entries e ${META_JOIN} WHERE ${where.join(" AND ")}
        ORDER BY day DESC, e.created_at DESC LIMIT ?`,
       [...params, opts.limit ?? 500],
     );
+    return this.summarize(entries.map(toEntry));
+  }
 
+  /** 一覧の1行に要るもの（タグ・構造名・写真の数）を添える */
+  private async summarize(entries: Entry[]): Promise<EntrySummary[]> {
     const ids = entries.map((e) => e.id);
     const tags = await this.tagsFor("entry", ids);
     const names = new Map<string, string[]>();
@@ -231,6 +388,7 @@ export class Repo {
 
   /** テンプレを写し取って構造として付ける。テンプレのタグも引き継ぐ。 */
   async addStructureFromTemplate(entryId: string, templateId: string): Promise<string | null> {
+    await this.assertEditable(entryId);
     const template = await this.getTemplate(templateId);
     if (!template) return null;
     return this.insertStructure(
@@ -249,6 +407,7 @@ export class Repo {
     fields: FieldDef[],
     tagIds: string[],
   ): Promise<string> {
+    await this.assertEditable(entryId);
     const id = uid();
     const t = now();
     const last = await this.db.all<{ p: number | null }>(
@@ -290,6 +449,7 @@ export class Repo {
     if (!rows.length) return;
     // 何も変えない呼び出しは、先に並んだ保存が終わるのを待つためだけに使える
     if (patch.name === undefined && patch.fields === undefined && patch.values === undefined) return;
+    await this.assertEditable(rows[0].entry_id);
     const current = toStructure(rows[0], []);
     const name = patch.name ?? current.name;
     const fields = patch.fields ?? current.fields;
@@ -312,6 +472,7 @@ export class Repo {
   private async moveStructureNow(id: string, direction: -1 | 1): Promise<void> {
     const rows = await this.db.all<{ entry_id: string }>(`SELECT entry_id FROM structures WHERE id = ?`, [id]);
     if (!rows.length) return;
+    await this.assertEditable(rows[0].entry_id);
     const siblings = await this.db.all<{ id: string }>(
       `SELECT id FROM structures WHERE entry_id = ? AND deleted = 0 ORDER BY position, created_at`,
       [rows[0].entry_id],
@@ -333,6 +494,7 @@ export class Repo {
 
   /** 構造をエントリから外す */
   async removeStructure(id: string): Promise<void> {
+    await this.assertStructureEditable(id);
     const t = now();
     await this.unlinkAll("structure", id, t);
     await this.db.run(`UPDATE structures SET deleted = 1, updated_at = ?, dirty = 1 WHERE id = ?`, [t, id]);
@@ -346,6 +508,7 @@ export class Repo {
       [structureId],
     );
     if (!rows.length) return null;
+    await this.assertEditable(rows[0].entry_id);
     const tags = (await this.tagsFor("structure", [structureId])).get(structureId) ?? [];
     const templateId = await this.createTemplate(rows[0].name, parseJson<FieldDef[]>(rows[0].fields, []));
     const t = now();
@@ -473,13 +636,19 @@ export class Repo {
     this.onChange();
   }
 
-  /** タグを消す。そのタグの付与と、他のタグとの関係も一緒に消す。 */
+  /**
+   * タグを消す。そのタグの付与と、他のタグとの関係も一緒に消す。
+   * ロック中の日記に付いた付与の行は書き換えない（その日記の「最終更新」を動かさないため）。
+   * タグそのものが消えるので、ロック中の日記からも表示は消える。
+   */
   async deleteTag(id: string): Promise<void> {
     const t = now();
-    await this.db.run(`UPDATE tag_links SET deleted = 1, updated_at = ?, dirty = 1 WHERE tag_id = ? AND deleted = 0`, [
-      t,
-      id,
-    ]);
+    await this.db.run(
+      `UPDATE tag_links AS l SET deleted = 1, updated_at = ?, dirty = 1
+       WHERE l.tag_id = ? AND l.deleted = 0 AND NOT EXISTS (
+         SELECT 1 FROM entry_meta m WHERE m.deleted = 0 AND m.locked = 1 AND m.id = ${linkEntry("l")})`,
+      [t, id],
+    );
     await this.db.run(
       `UPDATE tag_relations SET deleted = 1, updated_at = ?, dirty = 1
        WHERE (from_tag = ? OR to_tag = ?) AND deleted = 0`,
@@ -497,8 +666,10 @@ export class Repo {
       `SELECT from_tag, to_tag, kind FROM tag_relations WHERE deleted = 0`,
     );
     const counts = await this.db.all<{ tag_id: string; n: number }>(
-      `SELECT tag_id, COUNT(*) AS n FROM tag_links
-       WHERE deleted = 0 AND target_type IN ('entry', 'structure') GROUP BY tag_id`,
+      `SELECT l.tag_id, COUNT(*) AS n FROM tag_links l
+       WHERE l.deleted = 0 AND l.target_type IN ('entry', 'structure') AND NOT EXISTS (
+         SELECT 1 FROM entry_meta m WHERE m.deleted = 0 AND m.trashed_at IS NOT NULL AND m.id = ${linkEntry("l")})
+       GROUP BY l.tag_id`,
     );
     const info = new Map<string, TagInfo>(
       tags.map((t) => [t.id, { ...t, parent_id: null, related_ids: [], use_count: 0 }]),
@@ -558,6 +729,8 @@ export class Repo {
 
   /** エントリ・構造・テンプレにタグを付ける／外す */
   async setTagLinked(type: TagTarget, targetId: string, tagId: string, linked: boolean): Promise<void> {
+    if (type === "entry") await this.assertEditable(targetId);
+    if (type === "structure") await this.assertStructureEditable(targetId);
     await this.setLink(type, targetId, tagId, linked, now());
     // 付与は独立した行として同期するので、対象のエントリ自体の更新時刻は動かさない
     this.onChange();
@@ -611,6 +784,7 @@ export class Repo {
     entryId: string,
     image: { mime: string; width: number; height: number; data: string },
   ): Promise<string> {
+    await this.assertEditable(entryId);
     const id = uid();
     const t = now();
     const last = await this.db.all<{ p: number | null }>(
@@ -627,6 +801,7 @@ export class Repo {
   }
 
   async removeAttachment(id: string): Promise<void> {
+    await this.assertAttachmentEditable(id);
     await this.db.run(`UPDATE attachments SET deleted = 1, data = NULL, updated_at = ?, dirty = 1 WHERE id = ?`, [
       now(),
       id,

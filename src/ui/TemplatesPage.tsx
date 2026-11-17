@@ -19,12 +19,8 @@ export function TemplatesPage() {
           ＋ 新しく作る
         </button>
       </PageHeader>
-      <p className="lead">
-        テンプレは、日記に付ける「構造」のひな形です。日記の編集画面で「構造を付ける」から選ぶと、項目とタグが写し取られます。
-        テンプレを後から変えたり消したりしても、すでに日記に付けた構造は変わりません。
-      </p>
       {templates !== undefined && templates.length === 0 && (
-        <p className="hint">まだテンプレがありません。ここで作るか、日記に付けた構造を「テンプレとして保存」してください。</p>
+        <p className="empty-list">テンプレはありません</p>
       )}
       {(templates ?? []).map((t) =>
         openId === t.id ? (
@@ -62,7 +58,7 @@ function TemplateEditor(props: { template: Template; allTags: TagInfo[]; onClose
       <TagPicker
         tags={t.tags}
         allTags={props.allTags}
-        placeholder="＋ 付けたときに一緒に付くタグ"
+        placeholder="＋ タグ"
         onAdd={(tag) => void repo.setTagLinked("template", t.id, tag.id, true)}
         onRemove={(tag) => void repo.setTagLinked("template", t.id, tag.id, false)}
       />

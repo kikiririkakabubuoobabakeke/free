@@ -12,6 +12,7 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@fontsource-variable/noto-sans-jp": "^5.3.1",
     "@supabase/supabase-js": "^2.119.0",
     "@tauri-apps/api": "^2.12.4",
     "@tauri-apps/plugin-sql": "^2.6.0",

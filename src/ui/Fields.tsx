@@ -3,12 +3,22 @@ import { uid } from "../db/util";
 import { AutoTextarea } from "./bits";
 
 /** 構造の1項目に値を入れる欄 */
-export function FieldInput(props: { field: FieldDef; value: FieldValue | undefined; onChange: (v: FieldValue) => void }) {
-  const { field, value, onChange } = props;
+export function FieldInput(props: {
+  field: FieldDef;
+  value: FieldValue | undefined;
+  onChange: (v: FieldValue) => void;
+  disabled?: boolean;
+}) {
+  const { field, value, onChange, disabled } = props;
   switch (field.type) {
     case "longtext":
       return (
-        <AutoTextarea className="input" value={typeof value === "string" ? value : ""} onChange={(e) => onChange(e.target.value)} />
+        <AutoTextarea
+          className="input"
+          value={typeof value === "string" ? value : ""}
+          readOnly={disabled}
+          onChange={(e) => onChange(e.target.value)}
+        />
       );
     case "number":
       return (
@@ -16,6 +26,7 @@ export function FieldInput(props: { field: FieldDef; value: FieldValue | undefin
           className="input narrow"
           type="number"
           inputMode="decimal"
+          readOnly={disabled}
           value={typeof value === "number" ? value : ""}
           onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
         />
@@ -30,6 +41,7 @@ export function FieldInput(props: { field: FieldDef; value: FieldValue | undefin
               key={n}
               role="radio"
               aria-checked={current === n}
+              disabled={disabled}
               className={n <= current ? "on" : ""}
               // 同じ数をもう一度押すと未入力に戻る
               onClick={() => onChange(current === n ? null : n)}
@@ -44,13 +56,18 @@ export function FieldInput(props: { field: FieldDef; value: FieldValue | undefin
     case "check":
       return (
         <label className="check">
-          <input type="checkbox" checked={value === true} onChange={(e) => onChange(e.target.checked)} />
+          <input type="checkbox" checked={value === true} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
           <span>{value === true ? "はい" : "いいえ"}</span>
         </label>
       );
     case "select":
       return (
-        <select className="input narrow" value={typeof value === "string" ? value : ""} onChange={(e) => onChange(e.target.value || null)}>
+        <select
+          className="input narrow"
+          value={typeof value === "string" ? value : ""}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.value || null)}
+        >
           <option value="">—</option>
           {(field.options ?? []).map((o) => (
             <option key={o} value={o}>
@@ -60,7 +77,14 @@ export function FieldInput(props: { field: FieldDef; value: FieldValue | undefin
         </select>
       );
     default:
-      return <input className="input" value={typeof value === "string" ? value : ""} onChange={(e) => onChange(e.target.value)} />;
+      return (
+        <input
+          className="input"
+          value={typeof value === "string" ? value : ""}
+          readOnly={disabled}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      );
   }
 }
 
@@ -100,7 +124,7 @@ export function FieldsEditor(props: { fields: FieldDef[]; onChange: (fields: Fie
             <input
               className="input options"
               value={(f.options ?? []).join("、")}
-              placeholder="選択肢を「、」で区切って入力（例: 晴れ、曇り、雨）"
+              placeholder="晴れ、曇り、雨"
               aria-label="選択肢"
               onChange={(e) =>
                 patch(i, {

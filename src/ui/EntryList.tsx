@@ -2,6 +2,7 @@ import { useState } from "react";
 import { SYNC_ENABLED } from "../config";
 import type { EntrySummary } from "../db/types";
 import { toDateString } from "../db/util";
+import { LockIcon } from "./bits";
 import { freshEntries } from "./Editor";
 import { setFilter, useFilter } from "./filter";
 import { dayOf, formatMonth, formatTime } from "./format";
@@ -55,6 +56,9 @@ export function EntryList({ activeId }: { activeId: string | null }) {
           <button type="button" className="btn ghost small" onClick={() => go("templates")}>
             テンプレ
           </button>
+          <button type="button" className="btn ghost small" onClick={() => go("trash")}>
+            ゴミ箱
+          </button>
           <button type="button" className="btn ghost small" onClick={() => go("settings")}>
             設定
           </button>
@@ -66,7 +70,7 @@ export function EntryList({ activeId }: { activeId: string | null }) {
           className="input search"
           type="search"
           value={filter.query}
-          placeholder="検索（本文・構造・タグ）"
+          placeholder="検索"
           aria-label="検索"
           onChange={(e) => setFilter({ query: e.target.value })}
         />
@@ -85,7 +89,7 @@ export function EntryList({ activeId }: { activeId: string | null }) {
                 </span>
               ))
             : selected.map((tag) => <TagChip key={tag.id} tag={tag} active onRemove={() => toggleTag(tag.id)} />)}
-          {showTags && allTags.length === 0 && <span className="hint">まだタグがありません。日記や構造に付けると、ここで絞り込めます。</span>}
+          {showTags && allTags.length === 0 && <span className="hint">タグはありません</span>}
         </div>
       )}
 
@@ -95,7 +99,7 @@ export function EntryList({ activeId }: { activeId: string | null }) {
 
       <div className="entry-list">
         {entries !== undefined && entries.length === 0 && (
-          <p className="empty-list">{filtering ? "条件に合う日記はありません。" : "まだ日記がありません。最初の1件を書いてみましょう。"}</p>
+          <p className="empty-list">{filtering ? "見つかりません" : "日記はありません"}</p>
         )}
         {months.map(({ month, items }) => (
           <section key={month}>
@@ -122,7 +126,7 @@ function EntryRow({ entry, active }: { entry: EntrySummary; active: boolean }) {
   const { day, weekday } = dayOf(entry.day);
   const created = new Date(entry.created_at);
   const firstLine = entry.body.split("\n").find((line) => line.trim()) ?? "";
-  const heading = entry.title.trim() || firstLine || "（まだ何も書かれていません）";
+  const heading = entry.title.trim() || firstLine || "無題";
   const rest = entry.title.trim() ? entry.body : entry.body.slice(entry.body.indexOf(firstLine) + firstLine.length);
   return (
     <a className={`entry-row${active ? " active" : ""}`} href={`#/e/${entry.id}`}>
@@ -134,6 +138,11 @@ function EntryRow({ entry, active }: { entry: EntrySummary; active: boolean }) {
         <span className="entry-title">{heading}</span>
         {rest.trim() && <span className="entry-excerpt">{rest.trim()}</span>}
         <span className="entry-meta">
+          {entry.locked && (
+            <span className="locked-mark" title="ロック中">
+              <LockIcon />
+            </span>
+          )}
           {/* 左の日は「並べる日」。付けた日付が作成した日と違うときは、時刻だけだと紛らわしいので作成日を添える */}
           <span className="hint">
             {entry.day === toDateString(created) ? formatTime(entry.created_at) : `${created.getMonth() + 1}/${created.getDate()} に作成`}

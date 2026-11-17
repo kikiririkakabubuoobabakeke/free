@@ -29,23 +29,7 @@ function StorageSection() {
   return (
     <section className="card">
       <h2>保存場所</h2>
-      <p>
-        {SYNC_ENABLED
-          ? "日記はまずこの端末の中に保存され、ログインしていれば他の端末と同期されます。"
-          : "この版は同期なしです。日記はこの端末の中だけに保存され、外へは何も送られません。"}
-      </p>
-      {path ? (
-        <>
-          <code className="path">{path}</code>
-          <p className="hint">
-            このファイル1つに、日記・構造・タグ・写真がすべて入っています。控えを取るときは、アプリを終了してから
-            このファイルを別の場所へコピーしてください。別のパソコンへ移すときも、同じ場所にこのファイルを置けば引き継げます。
-            Mac では、Finder の「移動」→「フォルダへ移動」に上の場所を貼ると開けます。Time Machine を使っていれば自動で控えられます。
-          </p>
-        </>
-      ) : (
-        <p className="hint">いまはブラウザで開いているので、日記はこのブラウザの中に保存されています。</p>
-      )}
+      {path ? <code className="path">{path}</code> : <p className="hint">ブラウザ内</p>}
     </section>
   );
 }
@@ -80,7 +64,7 @@ function SyncSection() {
                 : state.phase === "error"
                   ? "エラー"
                   : state.lastSyncedAt
-                    ? `同期済み（${formatTime(state.lastSyncedAt)}）`
+                    ? `同期済み ${formatTime(state.lastSyncedAt)}`
                     : "同期待ち"}
             </dd>
           </dl>
@@ -93,10 +77,6 @@ function SyncSection() {
               ログアウト
             </button>
           </div>
-          <p className="hint">
-            書いた内容は数秒後に自動で送られ、他の端末の変更は1分ごとと、アプリを開き直したときに受け取ります。
-            ログアウトしても、この端末の日記は消えません。
-          </p>
         </>
       )}
     </section>
@@ -116,7 +96,6 @@ function ConfigForm(props: { onDone: () => void; canCancel: boolean }) {
         void sync.setConfig({ url: url.trim().replace(/\/+$/, ""), key: key.trim() }).then(props.onDone);
       }}
     >
-      <p className="hint">Supabase のプロジェクトの「Project URL」と「anon（publishable）key」を入れてください。作り方は README にあります。</p>
       <label className="field">
         <span className="field-label">Project URL</span>
         <input className="input" type="url" required value={url} placeholder="https://xxxx.supabase.co" autoCapitalize="none" autoCorrect="off" onChange={(e) => setUrl(e.target.value)} />
@@ -175,7 +154,7 @@ function LoginForm() {
           ログイン
         </button>
         <button type="button" className="btn" disabled={busy || !email || password.length < 6} onClick={() => void run("up")}>
-          はじめて使う（登録）
+          登録
         </button>
       </div>
     </form>

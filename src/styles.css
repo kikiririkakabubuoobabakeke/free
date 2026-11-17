@@ -1,35 +1,35 @@
+/* 色はモノトーン（無彩色）だけ。文字は Noto Sans JP（アプリに同梱）。 */
 :root {
-  --bg: #f4f1ea;
-  --surface: #fffdf8;
+  --bg: #f4f4f4;
+  --surface: #fbfbfb;
   --raised: #ffffff;
-  --text: #2b2924;
-  --muted: #857f73;
-  --line: #e3ddd0;
-  --accent: #a94f2a;
+  --text: #1c1c1c;
+  --muted: #7a7a7a;
+  --line: #e2e2e2;
+  --accent: #1c1c1c;
   --accent-text: #ffffff;
-  --accent-soft: #f3e3d8;
-  --danger: #b3261e;
-  --ok: #4f8a3c;
-  --shadow: 0 1px 2px rgb(60 50 30 / 8%), 0 4px 16px rgb(60 50 30 / 6%);
-  --sans: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic UI", "Segoe UI", "Noto Sans JP",
-    "Noto Sans CJK JP", sans-serif;
-  --serif: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
+  --accent-soft: #e9e9e9;
+  --danger: #1c1c1c;
+  --ok: #1c1c1c;
+  --shadow: 0 1px 2px rgb(0 0 0 / 6%), 0 4px 16px rgb(0 0 0 / 6%);
+  --sans: "Noto Sans JP Variable", "Noto Sans JP", sans-serif;
+  --serif: var(--sans);
   --radius: 10px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #1b1a18;
-    --surface: #242320;
-    --raised: #2d2b27;
-    --text: #ebe6dc;
-    --muted: #9c968a;
-    --line: #3a3832;
-    --accent: #e08c62;
-    --accent-text: #1b1a18;
-    --accent-soft: #3d2c22;
-    --danger: #f2877f;
-    --ok: #8fc47a;
+    --bg: #161616;
+    --surface: #1e1e1e;
+    --raised: #262626;
+    --text: #ececec;
+    --muted: #949494;
+    --line: #353535;
+    --accent: #ececec;
+    --accent-text: #161616;
+    --accent-soft: #2e2e2e;
+    --danger: #ececec;
+    --ok: #ececec;
     --shadow: 0 1px 2px rgb(0 0 0 / 30%), 0 4px 16px rgb(0 0 0 / 25%);
   }
 }
@@ -445,9 +445,9 @@ textarea.input {
   gap: 5px;
   max-width: 100%;
   padding: 1px 9px;
-  border: 1px solid color-mix(in srgb, var(--chip, var(--muted)) 45%, transparent);
+  border: 1px solid var(--line);
   border-radius: 99px;
-  background: color-mix(in srgb, var(--chip, var(--muted)) 12%, transparent);
+  background: var(--surface);
   font-size: 12.5px;
   line-height: 1.6;
   white-space: nowrap;
@@ -459,6 +459,7 @@ textarea.input {
   flex: none;
   border-radius: 50%;
   background: var(--chip);
+  box-shadow: 0 0 0 1px var(--muted);
 }
 
 .chip.clickable {
@@ -466,8 +467,8 @@ textarea.input {
 }
 
 .chip.active {
-  background: color-mix(in srgb, var(--chip, var(--muted)) 32%, transparent);
-  border-color: var(--chip);
+  background: var(--accent-soft);
+  border-color: var(--text);
   font-weight: 600;
 }
 
@@ -1054,6 +1055,19 @@ textarea.input {
   pointer-events: none;
 }
 
+.toast-action {
+  margin-left: 12px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
 .toast {
   padding: 8px 16px;
   border-radius: 99px;
@@ -1061,4 +1075,91 @@ textarea.input {
   color: var(--bg);
   font-size: 13.5px;
   box-shadow: var(--shadow);
+}
+
+/* ---------------------------------------------------------------- ロック・ゴミ箱 */
+
+.lock-icon {
+  flex: none;
+  vertical-align: -1px;
+}
+
+.btn.locked {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--bg);
+}
+
+.locked-mark {
+  display: inline-flex;
+  color: var(--muted);
+}
+
+/* 読むだけの状態では、入力欄に見せない */
+.read-only .title-input,
+.read-only .body-input,
+.read-only .structure-name {
+  cursor: default;
+}
+
+.read-only .structure .input {
+  border-color: transparent;
+  background: transparent;
+  padding-left: 0;
+}
+
+.read-only .rating button {
+  cursor: default;
+}
+
+.notice {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  font-size: 13.5px;
+}
+
+.date-text {
+  color: var(--text);
+}
+
+.trash-list {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--line);
+}
+
+.trash-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.trash-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+  color: inherit;
+  text-decoration: none;
+}
+
+.trash-date {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.trash-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  flex: none;
 }

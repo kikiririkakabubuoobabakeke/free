@@ -4,7 +4,7 @@ import { ConfirmButton, PageHeader } from "./bits";
 import { setFilter } from "./filter";
 import { go } from "./router";
 import { getApp, useQuery } from "./store";
-import { TagChip } from "./TagPicker";
+import { TagChip, toGray } from "./TagPicker";
 import { descendantIds, tagTree } from "./tagTree";
 
 /** タグの一覧と、タグ同士の関係（親子・関連）の編集 */
@@ -23,10 +23,6 @@ export function TagsPage() {
   return (
     <div className="page">
       <PageHeader title="タグ" />
-      <p className="lead">
-        タグは日記にも、日記に付けた構造にも付けられます。親を決めると、親タグで絞り込んだときに子のタグが付いたものも出ます。
-        関連を結ぶと、片方を付けたときにもう片方が候補に出ます。
-      </p>
       <form
         className="inline-form"
         onSubmit={(e) => {
@@ -40,7 +36,7 @@ export function TagsPage() {
         </button>
       </form>
 
-      {tags !== undefined && tags.length === 0 && <p className="hint">まだタグがありません。</p>}
+      {tags !== undefined && tags.length === 0 && <p className="empty-list">タグはありません</p>}
       <div className="tag-list">
         {tagTree(tags ?? []).map(({ tag, depth }) => (
           <div key={tag.id} className={`tag-item${openId === tag.id ? " open" : ""}`} style={{ marginLeft: Math.min(depth, 6) * 20 }}>
@@ -92,10 +88,10 @@ function TagEditor({ tag, all }: { tag: TagInfo; all: TagInfo[] }) {
             <button
               type="button"
               key={color}
-              className={`color${tag.color === color ? " on" : ""}`}
+              className={`color${toGray(tag.color) === color ? " on" : ""}`}
               style={{ background: color }}
               aria-label={`色 ${color}`}
-              aria-pressed={tag.color === color}
+              aria-pressed={toGray(tag.color) === color}
               onClick={() => void repo.updateTag(tag.id, { color })}
             />
           ))}

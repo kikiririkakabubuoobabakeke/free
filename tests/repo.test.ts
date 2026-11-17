@@ -14,8 +14,9 @@ describe("エントリ", () => {
     expect(list.map((e) => e.id)).toEqual([id, older]); // 新しい日付が先
     expect(list[0].title).toBe("初日");
 
-    await repo.deleteEntry(id);
+    await repo.trashEntry(id);
     expect((await repo.listEntries()).map((e) => e.id)).toEqual([older]);
+    await repo.purgeEntry(id);
     expect(await repo.getEntry(id)).toBeNull();
   });
 

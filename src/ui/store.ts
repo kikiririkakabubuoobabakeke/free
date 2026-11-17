@@ -37,6 +37,9 @@ export async function startApp(): Promise<App> {
     sync?.requestSync();
   });
   app = { repo, sync };
+  // ゴミ箱に入れてから期限を過ぎたものを完全に削除する。起動時と、開いたままなら1時間ごと。
+  await repo.purgeExpiredTrash();
+  setInterval(() => void repo.purgeExpiredTrash(), 3_600_000);
   // 同期の準備は通信を伴うことがあるので、画面を出すのを待たせない
   void sync?.init();
   return app;
@@ -88,6 +91,17 @@ export function useSyncState(): SyncState {
  * 入力欄の下書き。打つたびに画面はすぐ変わり、保存は少し待ってまとめて行う。
  * 外から来た値（同期など）は、こちらに未保存の入力が無いときだけ取り込む。
  */
+/** いま画面にある下書きの「保存し切る」関数 */
+const activeFlushers = new Set<() => Promise<void>>();
+
+/**
+ * 打ちかけの入力を、すべて保存し切る。
+ * ロックやゴミ箱への移動の前に呼ぶ（その後では保存が断られ、打った分が消えてしまうため）。
+ */
+export async function flushAllDrafts(): Promise<void> {
+  await Promise.all([...activeFlushers].map((flush) => flush()));
+}
+
 export function useDraft<T>(value: T, save: (next: T) => Promise<void> | void, delay = 500) {
   const [draft, setDraft] = useState(value);
   const pending = useRef<{ value: T } | null>(null);
@@ -95,14 +109,21 @@ export function useDraft<T>(value: T, save: (next: T) => Promise<void> | void, d
   const saveRef = useRef(save);
   saveRef.current = save;
 
-  const flush = useRef(() => {
+  const flush = useRef((): Promise<void> => {
     if (timer.current !== undefined) clearTimeout(timer.current);
     timer.current = undefined;
     const p = pending.current;
-    if (!p) return;
-    void Promise.resolve(saveRef.current(p.value)).then(() => {
-      if (pending.current === p) pending.current = null;
-    });
+    if (!p) return Promise.resolve();
+    return Promise.resolve(saveRef.current(p.value)).then(
+      () => {
+        if (pending.current === p) pending.current = null;
+      },
+      (error: unknown) => {
+        // 保存できなかった（ロックされた等）。画面は保存されている値に戻す。
+        if (pending.current === p) pending.current = null;
+        throw error;
+      },
+    );
   }).current;
 
   useEffect(() => {
@@ -111,13 +132,19 @@ export function useDraft<T>(value: T, save: (next: T) => Promise<void> | void, d
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(value)]);
 
-  useEffect(() => flush, [flush]); // 画面を離れるときに書き残しを保存
+  useEffect(() => {
+    activeFlushers.add(flush);
+    return () => {
+      activeFlushers.delete(flush);
+      void flush(); // 画面を離れるときに書き残しを保存
+    };
+  }, [flush]);
 
   const update = (next: T) => {
     setDraft(next);
     pending.current = { value: next };
     if (timer.current !== undefined) clearTimeout(timer.current);
-    timer.current = setTimeout(flush, delay);
+    timer.current = setTimeout(() => void flush(), delay);
   };
 
   return [draft, update, flush] as const;

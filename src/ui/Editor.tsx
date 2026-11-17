@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import type { EntryDetail, TagInfo, Template } from "../db/types";
-import { AutoTextarea, ConfirmButton, toast } from "./bits";
-import { dayOf, formatDateTime } from "./format";
+import { AutoTextarea, ConfirmButton, LockIcon, toast } from "./bits";
+import { dayOf, formatDate, formatDateTime, trashRemaining } from "./format";
 import { prepareImage } from "./image";
 import { go, goBack } from "./router";
-import { getApp, useDraft, useQuery } from "./store";
+import { flushAllDrafts, getApp, useDraft, useQuery } from "./store";
 import { StructureCard } from "./StructureCard";
 import { TagPicker } from "./TagPicker";
 
@@ -21,7 +21,7 @@ export function Editor({ id }: { id: string }) {
   if (entry === null) {
     return (
       <div className="empty">
-        <p>この日記は見つかりません。</p>
+        <p>見つかりません</p>
         <button type="button" className="btn" onClick={() => go("")}>
           一覧へ
         </button>
@@ -34,6 +34,9 @@ export function Editor({ id }: { id: string }) {
 function EditorBody(props: { entry: EntryDetail; allTags: TagInfo[]; templates: Template[] }) {
   const { repo } = getApp();
   const { entry } = props;
+  const trashed = entry.trashed_at !== null;
+  // ロック中とゴミ箱の中では、何も変えられない
+  const readOnly = entry.locked || trashed;
   const [title, setTitle] = useDraft(entry.title, (v) => repo.updateEntry(entry.id, { title: v }));
   const [body, setBody] = useDraft(entry.body, (v) => repo.updateEntry(entry.id, { body: v }));
   const [adding, setAdding] = useState(false);
@@ -41,20 +44,23 @@ function EditorBody(props: { entry: EntryDetail; allTags: TagInfo[]; templates: 
   const [viewing, setViewing] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
-  // 作ったばかりで何も書かれていないエントリは、離れるときに消す
+  // 作ったばかりで何も書かれていないエントリは、離れるときに消す（ゴミ箱には入れず、そのまま消す）
   const state = useRef({ empty: true, deleted: false });
   // 日付を付けただけでも、自分で手を入れたものなので「空」とは扱わない
   state.current.empty =
     !title.trim() &&
     !body.trim() &&
     !entry.date &&
+    !entry.locked &&
     !entry.tags.length &&
     !entry.structures.length &&
     !entry.attachments.length;
   useEffect(() => {
     const current = state.current;
     return () => {
-      if (freshEntries.delete(entry.id) && current.empty && !current.deleted) void repo.deleteEntry(entry.id);
+      if (freshEntries.delete(entry.id) && current.empty && !current.deleted) {
+        void repo.purgeEntry(entry.id);
+      }
     };
   }, [entry.id, repo]);
 
@@ -63,10 +69,20 @@ function EditorBody(props: { entry: EntryDetail; allTags: TagInfo[]; templates: 
     document.querySelector(".main")?.scrollTo(0, 0);
   }, [entry.id]);
 
-  const remove = async () => {
+  const toggleLock = async () => {
+    // 打ちかけの入力を保存し切ってからロックする（ロック後では保存が断られるため）
+    if (!entry.locked) await flushAllDrafts();
+    await repo.setLocked(entry.id, !entry.locked);
+    setAdding(false);
+  };
+
+  const moveToTrash = async () => {
+    await flushAllDrafts();
     state.current.deleted = true;
-    await repo.deleteEntry(entry.id);
+    freshEntries.delete(entry.id);
+    await repo.trashEntry(entry.id);
     go("", { replace: true });
+    toast("ゴミ箱に移しました", { label: "元に戻す", run: () => void repo.restoreEntry(entry.id) });
   };
 
   const addPhotos = async (files: FileList | null) => {
@@ -81,34 +97,62 @@ function EditorBody(props: { entry: EntryDetail; allTags: TagInfo[]; templates: 
   };
 
   return (
-    <article className="editor">
+    <article className={`editor${readOnly ? " read-only" : ""}`}>
       <header className="editor-bar">
         <button type="button" className="btn ghost back" onClick={goBack}>
-          ‹ 一覧
+          ‹ {trashed ? "戻る" : "一覧"}
         </button>
         <span className="spacer" />
-        <ConfirmButton label="削除" confirmLabel="この日記を削除" onConfirm={() => void remove()} />
+        {!trashed && (
+          <>
+            <button
+              type="button"
+              className={`btn small${entry.locked ? " locked" : " ghost"}`}
+              aria-pressed={entry.locked}
+              title={entry.locked ? "ロックを外して、変更できるようにする" : "ロックして、変更できないようにする"}
+              onClick={() => void toggleLock()}
+            >
+              <LockIcon open={!entry.locked} />
+              {entry.locked ? "ロック中" : "ロック"}
+            </button>
+            {!entry.locked && (
+              <button type="button" className="btn ghost small" onClick={() => void moveToTrash()}>
+                ゴミ箱へ
+              </button>
+            )}
+          </>
+        )}
       </header>
+
+      {trashed && <TrashBanner id={entry.id} trashedAt={entry.trashed_at!} />}
 
       {/* 日時は3つ。日付は自分で付けるもの、作成と最終更新は自動で入るもの。 */}
       <dl className="dates">
         <dt>日付</dt>
         <dd>
-          <input
-            type="date"
-            value={entry.date}
-            aria-label="日付"
-            onChange={(e) => void repo.updateEntry(entry.id, { date: e.target.value })}
-          />
-          {entry.date ? (
-            <>
-              <span>{dayOf(entry.date).weekday}曜日</span>
-              <button type="button" className="btn ghost small" onClick={() => void repo.updateEntry(entry.id, { date: "" })}>
-                外す
-              </button>
-            </>
+          {readOnly ? (
+            entry.date ? (
+              <span className="date-text">{formatDate(entry.date)}</span>
+            ) : (
+              <span className="hint">—</span>
+            )
           ) : (
-            <span className="hint">付けていません（作成日の位置に並びます）</span>
+            <>
+              <input
+                type="date"
+                value={entry.date}
+                aria-label="日付"
+                onChange={(e) => void repo.updateEntry(entry.id, { date: e.target.value })}
+              />
+              {entry.date ? (
+                <>
+                  <span>{dayOf(entry.date).weekday}曜日</span>
+                  <button type="button" className="btn ghost small" onClick={() => void repo.updateEntry(entry.id, { date: "" })}>
+                    外す
+                  </button>
+                </>
+              ) : null}
+            </>
           )}
         </dd>
         <dt>作成</dt>
@@ -117,19 +161,30 @@ function EditorBody(props: { entry: EntryDetail; allTags: TagInfo[]; templates: 
         <dd>{formatDateTime(entry.edited_at)}</dd>
       </dl>
 
-      <input className="title-input" value={title} placeholder="題（なくてもよい）" aria-label="題" onChange={(e) => setTitle(e.target.value)} />
+      {(!readOnly || title) && (
+        <input
+          className="title-input"
+          value={title}
+          placeholder="題"
+          aria-label="題"
+          readOnly={readOnly}
+          onChange={(e) => setTitle(e.target.value)}
+        />
+      )}
       <AutoTextarea
         className="body-input"
         value={body}
-        placeholder="今日のこと…"
+        placeholder={readOnly ? "" : "本文"}
         aria-label="本文"
-        autoFocus={freshEntries.has(entry.id)}
+        readOnly={readOnly}
+        autoFocus={!readOnly && freshEntries.has(entry.id)}
         onChange={(e) => setBody(e.target.value)}
       />
 
       <TagPicker
         tags={entry.tags}
         allTags={props.allTags}
+        readOnly={readOnly}
         onAdd={(tag) => void repo.setTagLinked("entry", entry.id, tag.id, true)}
         onRemove={(tag) => void repo.setTagLinked("entry", entry.id, tag.id, false)}
       />
@@ -150,20 +205,23 @@ function EditorBody(props: { entry: EntryDetail; allTags: TagInfo[]; templates: 
           isFirst={i === 0}
           isLast={i === entry.structures.length - 1}
           startEditing={s.id === justAdded}
+          readOnly={readOnly}
         />
       ))}
 
-      <div className="editor-add">
-        <button type="button" className={`btn${adding ? " primary" : ""}`} onClick={() => setAdding(!adding)}>
-          ＋ 構造を付ける
-        </button>
-        <button type="button" className="btn" onClick={() => fileInput.current?.click()}>
-          ＋ 写真
-        </button>
-        <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(e) => void addPhotos(e.target.files)} />
-      </div>
+      {!readOnly && (
+        <div className="editor-add">
+          <button type="button" className={`btn${adding ? " primary" : ""}`} onClick={() => setAdding(!adding)}>
+            ＋ 構造を付ける
+          </button>
+          <button type="button" className="btn" onClick={() => fileInput.current?.click()}>
+            ＋ 写真
+          </button>
+          <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(e) => void addPhotos(e.target.files)} />
+        </div>
+      )}
 
-      {adding && (
+      {adding && !readOnly && (
         <div className="template-menu">
           {props.templates.map((t) => (
             <button
@@ -188,7 +246,6 @@ function EditorBody(props: { entry: EntryDetail; allTags: TagInfo[]; templates: 
             }}
           >
             <strong>空の構造を作る</strong>
-            <span className="hint">項目を自分で決める。あとでテンプレとして保存できる。</span>
           </button>
         </div>
       )}
@@ -197,13 +254,41 @@ function EditorBody(props: { entry: EntryDetail; allTags: TagInfo[]; templates: 
         <Lightbox
           id={viewing}
           onClose={() => setViewing(null)}
-          onRemove={() => {
-            void repo.removeAttachment(viewing);
-            setViewing(null);
-          }}
+          onRemove={
+            readOnly
+              ? undefined
+              : () => {
+                  void repo.removeAttachment(viewing);
+                  setViewing(null);
+                }
+          }
         />
       )}
     </article>
+  );
+}
+
+/** ゴミ箱の中の日記を開いたときの案内。元に戻すか、完全に削除するかを選べる。 */
+function TrashBanner(props: { id: string; trashedAt: number }) {
+  const { repo } = getApp();
+  return (
+    <div className="notice trash">
+      <p>ゴミ箱の中です。{trashRemaining(props.trashedAt)}完全に削除されます。</p>
+      <div className="row">
+        <button type="button" className="btn primary small" onClick={() => void repo.restoreEntry(props.id)}>
+          元に戻す
+        </button>
+        <ConfirmButton
+          label="完全に削除"
+          confirmLabel="元に戻せません。削除する"
+          className="btn small"
+          onConfirm={async () => {
+            await repo.purgeEntry(props.id);
+            go("trash", { replace: true });
+          }}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -241,13 +326,15 @@ function Photo(props: { id: string; hasData: boolean; onOpen: () => void }) {
   );
 }
 
-function Lightbox(props: { id: string; onClose: () => void; onRemove: () => void }) {
+function Lightbox(props: { id: string; onClose: () => void; onRemove?: () => void }) {
   const url = useAttachmentUrl(props.id, true);
   return (
     <div className="lightbox" onClick={props.onClose}>
       {url && <img src={url} alt="" />}
       <div className="lightbox-bar" onClick={(e) => e.stopPropagation()}>
-        <ConfirmButton label="この写真を外す" confirmLabel="外す" className="btn" onConfirm={props.onRemove} />
+        {props.onRemove && (
+          <ConfirmButton label="この写真を外す" confirmLabel="外す" className="btn" onConfirm={props.onRemove} />
+        )}
         <button type="button" className="btn" onClick={props.onClose}>
           閉じる
         </button>

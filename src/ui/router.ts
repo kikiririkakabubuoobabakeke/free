@@ -5,6 +5,7 @@ export type Route =
   | { page: "entry"; id: string }
   | { page: "tags" }
   | { page: "templates" }
+  | { page: "trash" }
   | { page: "settings" };
 
 function parse(hash: string): Route {
@@ -12,6 +13,7 @@ function parse(hash: string): Route {
   if (parts[0] === "e" && parts[1]) return { page: "entry", id: parts[1] };
   if (parts[0] === "tags") return { page: "tags" };
   if (parts[0] === "templates") return { page: "templates" };
+  if (parts[0] === "trash") return { page: "trash" };
   if (parts[0] === "settings") return { page: "settings" };
   return { page: "list" };
 }

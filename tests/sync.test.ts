@@ -101,7 +101,8 @@ describe("同期", () => {
     await syncOnce(phone.db, remote);
     expect(remote.blobs.has(photo)).toBe(true);
 
-    await phone.repo.deleteEntry(e);
+    await phone.repo.trashEntry(e);
+    await phone.repo.emptyTrash();
     await syncOnce(phone.db, remote);
     await syncOnce(pc.db, remote);
     expect(await pc.repo.getEntry(e)).toBeNull();
@@ -176,5 +177,54 @@ describe("3つの日時の同期", () => {
     expect((await phone.repo.getEntry(plain))!.date).toBe("");
     // 受け取っただけでは最終更新は進まない（構造のタグ付けの時刻のまま）
     expect((await phone.repo.getEntry(plain))!.edited_at).toBeGreaterThan((await phone.repo.getEntry(plain))!.created_at);
+  });
+});
+
+describe("ロックとゴミ箱の同期", () => {
+  it("ロックが届き、届いた先でも変更が断られる。最終更新は両方で同じまま", async () => {
+    const remote = new FakeRemote();
+    const pc = await openTestDb();
+    const phone = await openTestDb();
+    const e = await pc.repo.createEntry();
+    await pc.repo.updateEntry(e, { body: "大事な日記" });
+    await syncOnce(pc.db, remote);
+    await syncOnce(phone.db, remote);
+    const editedAt = (await phone.repo.getEntry(e))!.edited_at;
+
+    await tick();
+    await pc.repo.setLocked(e, true);
+    await syncOnce(pc.db, remote);
+    await syncOnce(phone.db, remote);
+    const onPhone = (await phone.repo.getEntry(e))!;
+    expect(onPhone.locked).toBe(true);
+    expect(onPhone.edited_at).toBe(editedAt);
+    expect((await pc.repo.getEntry(e))!.edited_at).toBe(editedAt);
+    await expect(phone.repo.updateEntry(e, { body: "書き換え" })).rejects.toThrow();
+
+    await phone.repo.setLocked(e, false);
+    await syncOnce(phone.db, remote);
+    await syncOnce(pc.db, remote);
+    expect((await pc.repo.getEntry(e))!.locked).toBe(false);
+  });
+
+  it("ゴミ箱に入れたこと・戻したことが届く", async () => {
+    const remote = new FakeRemote();
+    const pc = await openTestDb();
+    const phone = await openTestDb();
+    const e = await pc.repo.createEntry();
+    await syncOnce(pc.db, remote);
+    await syncOnce(phone.db, remote);
+
+    await pc.repo.trashEntry(e);
+    await syncOnce(pc.db, remote);
+    await syncOnce(phone.db, remote);
+    expect(await phone.repo.listEntries()).toEqual([]);
+    expect((await phone.repo.listTrash()).map((x) => x.id)).toEqual([e]);
+
+    await phone.repo.restoreEntry(e);
+    await syncOnce(phone.db, remote);
+    await syncOnce(pc.db, remote);
+    expect((await pc.repo.listEntries()).map((x) => x.id)).toEqual([e]);
+    expect(await pc.repo.listTrash()).toEqual([]);
   });
 });
