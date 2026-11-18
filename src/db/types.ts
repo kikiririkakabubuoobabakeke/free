@@ -134,5 +134,22 @@ export interface TagInfo extends Tag {
   use_count: number;
 }
 
-/** タグの色。モノトーンの濃淡だけ。 */
-export const TAG_COLORS = ["#1c1c1c", "#3d3d3d", "#5e5e5e", "#7f7f7f", "#a0a0a0", "#c1c1c1"];
+/** タグの色。パステル（赤・橙・黄緑・青緑・青・紫・桃・灰）。 */
+export const TAG_COLORS = ["#e88a8f", "#f0b37a", "#a5cf8f", "#86cbbf", "#8eb6e6", "#b3a1e3", "#eaa0c8", "#b8b0b4"];
+
+/** 以前の版の色の並び。同じ位置のパステルの色で見せる。 */
+const OLD_TAG_COLORS = [
+  ["#c2553f", "#c98a1b", "#5a8f3c", "#2f8f83", "#3b74c4", "#7a5cc4", "#b8508f", "#8a8f98"],
+  ["#1c1c1c", "#3d3d3d", "#5e5e5e", "#7f7f7f", "#a0a0a0", "#c1c1c1"],
+];
+
+/** タグに保存されている色を、表示する色にする */
+export function tagColor(color: string): string {
+  const c = color.toLowerCase();
+  if (TAG_COLORS.includes(c)) return c;
+  for (const old of OLD_TAG_COLORS) {
+    const i = old.indexOf(c);
+    if (i >= 0) return TAG_COLORS[i % TAG_COLORS.length];
+  }
+  return TAG_COLORS[TAG_COLORS.length - 1];
+}

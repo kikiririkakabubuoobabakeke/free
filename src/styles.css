@@ -1,17 +1,22 @@
-/* 色はモノトーン（無彩色）だけ。文字は Noto Sans JP（アプリに同梱）。 */
+/*
+ * 色はパステル。差し色は、やや濃いめのパステルの赤（--accent）。
+ * 白い文字を載せるボタンには、読みやすさのため少し締めた赤（--accent-strong）を使う。
+ * 文字は Noto Sans JP（アプリに同梱）。
+ */
 :root {
-  --bg: #f4f4f4;
-  --surface: #fbfbfb;
+  --bg: #fbf7f4;
+  --surface: #fffcfa;
   --raised: #ffffff;
-  --text: #1c1c1c;
-  --muted: #7a7a7a;
-  --line: #e2e2e2;
-  --accent: #1c1c1c;
+  --text: #3b3236;
+  --muted: #84787d;
+  --line: #efe4e1;
+  --accent: #d4606a;
+  --accent-strong: #c95560;
   --accent-text: #ffffff;
-  --accent-soft: #e9e9e9;
-  --danger: #1c1c1c;
-  --ok: #1c1c1c;
-  --shadow: 0 1px 2px rgb(0 0 0 / 6%), 0 4px 16px rgb(0 0 0 / 6%);
+  --accent-soft: #fbe6e6;
+  --danger: #c95560;
+  --ok: #6fae86;
+  --shadow: 0 1px 2px rgb(120 70 70 / 6%), 0 4px 16px rgb(120 70 70 / 6%);
   --sans: "Noto Sans JP Variable", "Noto Sans JP", sans-serif;
   --serif: var(--sans);
   --radius: 10px;
@@ -19,17 +24,18 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #161616;
-    --surface: #1e1e1e;
-    --raised: #262626;
-    --text: #ececec;
-    --muted: #949494;
-    --line: #353535;
-    --accent: #ececec;
-    --accent-text: #161616;
-    --accent-soft: #2e2e2e;
-    --danger: #ececec;
-    --ok: #ececec;
+    --bg: #1f1b1d;
+    --surface: #262124;
+    --raised: #2e282b;
+    --text: #f1e9ec;
+    --muted: #a99da2;
+    --line: #3d3438;
+    --accent: #ee8f97;
+    --accent-strong: #ee8f97;
+    --accent-text: #241c1f;
+    --accent-soft: #44292d;
+    --danger: #ee8f97;
+    --ok: #9fd3b0;
     --shadow: 0 1px 2px rgb(0 0 0 / 30%), 0 4px 16px rgb(0 0 0 / 25%);
   }
 }
@@ -181,9 +187,10 @@ p {
 }
 
 .btn.primary {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
   color: var(--accent-text);
+  font-weight: 500;
 }
 
 .btn.ghost {
@@ -455,9 +462,9 @@ textarea.input {
   gap: 5px;
   max-width: 100%;
   padding: 1px 9px;
-  border: 1px solid var(--line);
+  border: 1px solid color-mix(in srgb, var(--chip, var(--muted)) 50%, var(--surface));
   border-radius: 99px;
-  background: var(--surface);
+  background: color-mix(in srgb, var(--chip, var(--muted)) 22%, var(--surface));
   font-size: 12.5px;
   line-height: 1.6;
   white-space: nowrap;
@@ -469,7 +476,6 @@ textarea.input {
   flex: none;
   border-radius: 50%;
   background: var(--chip);
-  box-shadow: 0 0 0 1px var(--muted);
 }
 
 .chip.clickable {
@@ -478,7 +484,7 @@ textarea.input {
 
 .chip.active {
   background: var(--accent-soft);
-  border-color: var(--text);
+  border-color: var(--accent);
   font-weight: 600;
 }
 
@@ -793,7 +799,7 @@ textarea.input {
 
 .structure.editing {
   gap: 10px;
-  border-left-color: var(--text);
+  border-left-color: var(--accent);
 }
 
 .structure-head {
@@ -910,7 +916,7 @@ textarea.input {
 
 .structure .field .input:focus {
   outline: none;
-  border-bottom-color: var(--text);
+  border-bottom-color: var(--accent);
 }
 
 .structure .field input[type="number"] {
@@ -956,7 +962,7 @@ textarea.input {
 }
 
 .rating button.on {
-  color: var(--text);
+  color: var(--accent);
 }
 
 .rating .hint {
@@ -974,7 +980,7 @@ textarea.input {
 .check input {
   width: 16px;
   height: 16px;
-  accent-color: var(--text);
+  accent-color: var(--accent);
 }
 
 .structure .tag-picker {
@@ -1205,9 +1211,9 @@ textarea.input {
 }
 
 .btn.locked {
-  background: var(--text);
-  border-color: var(--text);
-  color: var(--bg);
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+  color: var(--accent-text);
 }
 
 .locked-mark {
@@ -1281,21 +1287,21 @@ textarea.input {
 /* ---------------------------------------------------------------- 総合ページ・カレンダー */
 
 :root {
-  /* 書いた量の濃さ。0 は書いていない日。 */
-  --lv1: #e3e3e3;
-  --lv2: #c2c2c2;
-  --lv3: #7d7d7d;
-  --lv4: #2e2e2e;
+  /* 書いた量の濃さ。0 は書いていない日。差し色の赤の、淡いものから濃いものへ。 */
+  --lv1: #fbe3e3;
+  --lv2: #f5c3c6;
+  --lv3: #ea9ba1;
+  --lv4: #d4606a;
   --lv-ink-dark: #ffffff;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --lv1: #2d2d2d;
-    --lv2: #4a4a4a;
-    --lv3: #8c8c8c;
-    --lv4: #d6d6d6;
-    --lv-ink-dark: #161616;
+    --lv1: #3c2a2e;
+    --lv2: #5c363c;
+    --lv3: #9b5560;
+    --lv4: #ee8f97;
+    --lv-ink-dark: #241c1f;
   }
 }
 
@@ -1371,7 +1377,7 @@ textarea.input {
   bottom: 0;
   width: 2px;
   border-radius: 1px;
-  background: var(--text);
+  background: var(--accent);
 }
 
 .calendar-row.center::before {
@@ -1414,7 +1420,6 @@ textarea.input {
 
 .calendar-cell.lv3 {
   background: var(--lv3);
-  color: var(--lv-ink-dark);
 }
 
 .calendar-cell.lv4 {
@@ -1427,12 +1432,11 @@ textarea.input {
 }
 
 .calendar-cell.today {
-  box-shadow: inset 0 0 0 2px var(--text);
+  box-shadow: inset 0 0 0 2px var(--accent);
 }
 
-.calendar-cell.today.lv3,
 .calendar-cell.today.lv4 {
-  box-shadow: inset 0 0 0 2px var(--lv-ink-dark), 0 0 0 2px var(--text);
+  box-shadow: inset 0 0 0 2px var(--lv-ink-dark), 0 0 0 2px var(--accent);
 }
 
 .cell-day {
@@ -1587,7 +1591,7 @@ textarea.input {
   width: 15px;
   height: 15px;
   flex: none;
-  accent-color: var(--text);
+  accent-color: var(--accent);
 }
 
 .plan-time {
@@ -1649,7 +1653,7 @@ textarea.input {
 }
 
 .plan:focus-within {
-  border-bottom-color: var(--text);
+  border-bottom-color: var(--accent);
 }
 
 .plan-plus {

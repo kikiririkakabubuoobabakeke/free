@@ -1,23 +1,13 @@
 import { useMemo, useState, type CSSProperties } from "react";
-import type { Tag, TagInfo } from "../db/types";
+import { tagColor, type Tag, type TagInfo } from "../db/types";
 import { getApp } from "./store";
-
-/** 色を、明るさを保った灰色にする（前の版で付けた色付きのタグもモノトーンで見せるため） */
-export function toGray(color: string): string {
-  const m = /^#([0-9a-f]{6})$/i.exec(color);
-  if (!m) return "#7f7f7f";
-  const n = parseInt(m[1], 16);
-  const y = Math.round(0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255));
-  const h = y.toString(16).padStart(2, "0");
-  return `#${h}${h}${h}`;
-}
 
 export function TagChip(props: { tag: Tag; onRemove?: () => void; onClick?: () => void; active?: boolean }) {
   const { tag } = props;
   return (
     <span
       className={`chip${props.active ? " active" : ""}${props.onClick ? " clickable" : ""}`}
-      style={{ "--chip": toGray(tag.color) } as CSSProperties}
+      style={{ "--chip": tagColor(tag.color) } as CSSProperties}
       onClick={props.onClick}
     >
       <span className="chip-dot" />

@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { TAG_COLORS, type TagInfo } from "../db/types";
+import { TAG_COLORS, tagColor, type TagInfo } from "../db/types";
 import { ConfirmButton, PageHeader } from "./bits";
 import { setFilter } from "./filter";
 import { go } from "./router";
 import { getApp, useQuery } from "./store";
-import { TagChip, toGray } from "./TagPicker";
+import { TagChip } from "./TagPicker";
 import { descendantIds, tagTree } from "./tagTree";
 
 /** タグの一覧と、タグ同士の関係（親子・関連）の編集 */
@@ -88,10 +88,10 @@ function TagEditor({ tag, all }: { tag: TagInfo; all: TagInfo[] }) {
             <button
               type="button"
               key={color}
-              className={`color${toGray(tag.color) === color ? " on" : ""}`}
+              className={`color${tagColor(tag.color) === color ? " on" : ""}`}
               style={{ background: color }}
               aria-label={`色 ${color}`}
-              aria-pressed={toGray(tag.color) === color}
+              aria-pressed={tagColor(tag.color) === color}
               onClick={() => void repo.updateTag(tag.id, { color })}
             />
           ))}
