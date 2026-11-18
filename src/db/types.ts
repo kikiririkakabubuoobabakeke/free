@@ -45,6 +45,25 @@ export interface Entry {
   trashed_at: number | null;
 }
 
+/** 予定 */
+export interface Plan {
+  id: string;
+  /** YYYY-MM-DD */
+  date: string;
+  /** "HH:MM"。時刻を決めていない予定は空文字。 */
+  time: string;
+  title: string;
+  done: boolean;
+}
+
+/** カレンダーの1日分 */
+export interface DayStat {
+  /** その日に並ぶ日記の数（ゴミ箱の中は数えない） */
+  entries: number;
+  /** その日に並ぶ日記の、題と本文の文字数の合計（改行は数えない） */
+  chars: number;
+}
+
 /** ゴミ箱に入れた日記を、自動で完全に削除するまでの日数 */
 export const TRASH_DAYS = 30;
 

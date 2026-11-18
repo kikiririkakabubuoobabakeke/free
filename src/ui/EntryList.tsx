@@ -47,9 +47,14 @@ export function EntryList({ activeId }: { activeId: string | null }) {
   return (
     <aside className="sidebar">
       <header className="sidebar-head">
-        <h1>日記</h1>
+        <h1>
+          <a href="#/">日記</a>
+        </h1>
         {SYNC_ENABLED && <SyncBadge />}
         <nav>
+          <button type="button" className="btn ghost small calendar-link" onClick={() => go("calendar")}>
+            カレンダー
+          </button>
           <button type="button" className="btn ghost small" onClick={() => go("tags")}>
             タグ
           </button>

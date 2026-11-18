@@ -169,8 +169,10 @@ p {
   white-space: nowrap;
 }
 
-.btn:hover:not(:disabled) {
-  border-color: var(--muted);
+@media (hover: hover) {
+  .btn:hover:not(:disabled) {
+    border-color: var(--muted);
+  }
 }
 
 .btn:disabled {
@@ -190,7 +192,15 @@ p {
   color: var(--muted);
 }
 
-.btn.ghost:hover:not(:disabled) {
+@media (hover: hover) {
+  .btn.ghost:hover:not(:disabled) {
+    background: var(--accent-soft);
+    border-color: transparent;
+    color: var(--text);
+  }
+}
+
+.btn.ghost:active:not(:disabled) {
   background: var(--accent-soft);
   border-color: transparent;
   color: var(--text);
@@ -653,7 +663,7 @@ textarea.input {
 
 .body-input {
   display: block;
-  min-height: 9em;
+  min-height: 4em;
   padding: 0;
   resize: none;
   overflow: hidden;
@@ -719,10 +729,14 @@ textarea.input {
 
 .editor-add {
   display: flex;
-  gap: 8px;
+  gap: 4px;
   flex-wrap: wrap;
-  padding-top: 6px;
-  border-top: 1px solid var(--line);
+  margin-left: -10px;
+}
+
+.btn.ghost.on {
+  color: var(--text);
+  background: var(--accent-soft);
 }
 
 .template-menu {
@@ -764,50 +778,79 @@ textarea.input {
 
 /* ---------------------------------------------------------------- 構造 */
 
+/*
+ * 構造は、本文の続きに書き込まれた記録のように見せる。
+ * 枠や背景は付けず、細い縦線と小さな見出しだけでまとまりを示す。値は本文と同じ文字で、入力欄の線は触れたときだけ出す。
+ */
 .structure {
   display: flex;
   flex-direction: column;
+  gap: 4px;
+  margin: 2px 0;
+  padding: 2px 0 2px 14px;
+  border-left: 1px solid var(--line);
+}
+
+.structure.editing {
   gap: 10px;
-  padding: 12px 14px;
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--accent);
-  border-radius: var(--radius);
-  background: var(--surface);
+  border-left-color: var(--text);
 }
 
 .structure-head {
   display: flex;
   align-items: center;
   gap: 6px;
+  min-height: 28px;
 }
 
 .structure-name {
   flex: 1;
   min-width: 0;
-  padding: 2px 0;
+  padding: 0;
   border: 0;
-  border-bottom: 1px solid transparent;
   background: transparent;
-  font-size: 16px;
+  color: var(--muted);
+  font-size: 12.5px;
   font-weight: 600;
+  letter-spacing: 0.06em;
 }
 
 .structure-name:focus {
   outline: none;
-  border-bottom-color: var(--accent);
+  color: var(--text);
 }
 
 .structure-actions {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 0;
   flex: none;
+  transition: opacity 0.15s;
+}
+
+.structure-actions .btn {
+  min-height: 26px;
+  font-size: 12px;
+}
+
+.structure-actions .btn.icon {
+  width: 26px;
+}
+
+/* マウスで使うときは、操作ボタンは構造に触れたときだけ出す */
+@media (hover: hover) {
+  .structure:not(.editing) .structure-actions {
+    opacity: 0;
+  }
+  .structure:hover .structure-actions,
+  .structure:focus-within .structure-actions {
+    opacity: 1;
+  }
 }
 
 .structure-fields {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 10px 16px;
+  display: flex;
+  flex-direction: column;
 }
 
 .structure-foot,
@@ -831,6 +874,68 @@ textarea.input {
   color: var(--muted);
 }
 
+/* 構造の中の1項目は「名前　値」の1行 */
+.structure .field {
+  display: grid;
+  grid-template-columns: minmax(4.5em, max-content) minmax(0, 1fr);
+  align-items: center;
+  column-gap: 16px;
+  min-height: 30px;
+}
+
+.structure .field-label {
+  font-size: 13.5px;
+}
+
+.structure .field .input,
+.structure .field .rating,
+.structure .field .check {
+  min-height: 30px;
+}
+
+.structure .field .input {
+  width: 100%;
+  padding: 3px 0;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.structure .field .input:hover:not([readonly]):not(:disabled) {
+  border-bottom-color: var(--line);
+}
+
+.structure .field .input:focus {
+  outline: none;
+  border-bottom-color: var(--text);
+}
+
+.structure .field input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.structure .field input[type="number"]::-webkit-inner-spin-button,
+.structure .field input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.structure .field select.input {
+  width: auto;
+  min-width: 4em;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+.structure .field-longtext {
+  grid-template-columns: 1fr;
+}
+
 .rating {
   display: flex;
   align-items: center;
@@ -839,23 +944,23 @@ textarea.input {
 }
 
 .rating button {
-  width: 30px;
-  height: 30px;
+  width: 22px;
+  height: 26px;
   padding: 0;
   border: 0;
   background: none;
   color: var(--line);
-  font-size: 20px;
+  font-size: 13px;
   line-height: 1;
   cursor: pointer;
 }
 
 .rating button.on {
-  color: var(--accent);
+  color: var(--text);
 }
 
 .rating .hint {
-  margin-left: 6px;
+  margin-left: 8px;
 }
 
 .check {
@@ -867,16 +972,26 @@ textarea.input {
 }
 
 .check input {
-  width: 20px;
-  height: 20px;
-  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+  accent-color: var(--text);
 }
 
+.structure .tag-picker {
+  margin-top: 2px;
+}
+
+.structure .tag-input {
+  min-height: 24px;
+  font-size: 13px;
+}
+
+/* 項目の編集（編集しているときだけの欄なので、入力欄らしく見せる） */
 .fields-editor {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 8px;
+  gap: 6px;
 }
 
 .field-def {
@@ -885,6 +1000,11 @@ textarea.input {
   gap: 6px;
   width: 100%;
   align-items: center;
+}
+
+.field-def .input {
+  min-height: 32px;
+  font-size: 15px;
 }
 
 .field-def .options {
@@ -1102,12 +1222,6 @@ textarea.input {
   cursor: default;
 }
 
-.read-only .structure .input {
-  border-color: transparent;
-  background: transparent;
-  padding-left: 0;
-}
-
 .read-only .rating button {
   cursor: default;
 }
@@ -1162,4 +1276,449 @@ textarea.input {
   justify-content: flex-end;
   gap: 4px;
   flex: none;
+}
+
+/* ---------------------------------------------------------------- 総合ページ・カレンダー */
+
+:root {
+  /* 書いた量の濃さ。0 は書いていない日。 */
+  --lv1: #e3e3e3;
+  --lv2: #c2c2c2;
+  --lv3: #7d7d7d;
+  --lv4: #2e2e2e;
+  --lv-ink-dark: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --lv1: #2d2d2d;
+    --lv2: #4a4a4a;
+    --lv3: #8c8c8c;
+    --lv4: #d6d6d6;
+    --lv-ink-dark: #161616;
+  }
+}
+
+.sidebar-head h1 a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* 広い画面では、一覧の横に総合ページが出ているので「カレンダー」は要らない */
+@media (min-width: 820px) {
+  .calendar-link {
+    display: none;
+  }
+}
+
+.page.home {
+  gap: 18px;
+}
+
+.summary {
+  display: flex;
+  gap: 28px;
+  min-height: 44px;
+}
+
+.summary > div {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.summary-value {
+  font-size: 26px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.summary-label {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.calendar {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.calendar-row {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.calendar-head span {
+  padding-bottom: 2px;
+  color: var(--muted);
+  font-size: 11.5px;
+  text-align: center;
+}
+
+/* 今週（中央の行）は、左右に細い線を引いて示す */
+.calendar-row.center {
+  position: relative;
+}
+
+.calendar-row.center::before,
+.calendar-row.center::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--text);
+}
+
+.calendar-row.center::before {
+  left: -8px;
+}
+
+.calendar-row.center::after {
+  right: -8px;
+}
+
+.calendar-cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  min-width: 0;
+  height: 64px;
+  padding: 5px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.calendar-cell:hover {
+  outline: 1px solid var(--muted);
+}
+
+.calendar-cell.lv1 {
+  background: var(--lv1);
+}
+
+.calendar-cell.lv2 {
+  background: var(--lv2);
+}
+
+.calendar-cell.lv3 {
+  background: var(--lv3);
+  color: var(--lv-ink-dark);
+}
+
+.calendar-cell.lv4 {
+  background: var(--lv4);
+  color: var(--lv-ink-dark);
+}
+
+.calendar-cell.future .cell-day {
+  opacity: 0.6;
+}
+
+.calendar-cell.today {
+  box-shadow: inset 0 0 0 2px var(--text);
+}
+
+.calendar-cell.today.lv3,
+.calendar-cell.today.lv4 {
+  box-shadow: inset 0 0 0 2px var(--lv-ink-dark), 0 0 0 2px var(--text);
+}
+
+.cell-day {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+}
+
+.calendar-cell.today .cell-day {
+  font-weight: 700;
+}
+
+.cell-plans {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.cell-plan {
+  overflow: hidden;
+  font-size: 10.5px;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cell-plan::before {
+  content: "・";
+}
+
+.cell-plan.more::before {
+  content: "";
+}
+
+.cell-dot {
+  display: none;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* 狭い画面では、予定は題の代わりに点で示す */
+@media (max-width: 560px) {
+  .calendar-cell {
+    height: 46px;
+    padding: 4px;
+  }
+  .cell-plan {
+    display: none;
+  }
+  .cell-dot {
+    display: block;
+    margin-top: 2px;
+  }
+  .calendar-row.center::before {
+    left: -6px;
+  }
+  .calendar-row.center::after {
+    right: -6px;
+  }
+}
+
+.calendar-nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: -8px;
+  margin-left: -10px;
+}
+
+.legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.legend-cell {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.legend-cell.lv1 {
+  background: var(--lv1);
+}
+
+.legend-cell.lv2 {
+  background: var(--lv2);
+}
+
+.legend-cell.lv3 {
+  background: var(--lv3);
+}
+
+.legend-cell.lv4 {
+  background: var(--lv4);
+}
+
+.upcoming h2,
+.day-section h2 {
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.upcoming-day {
+  display: grid;
+  grid-template-columns: 7.5em minmax(0, 1fr);
+  gap: 12px;
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+}
+
+.upcoming-date {
+  align-self: start;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.upcoming-date:hover {
+  color: var(--text);
+}
+
+.upcoming ul,
+.plan-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.upcoming li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+}
+
+.upcoming input[type="checkbox"],
+.plan input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  accent-color: var(--text);
+}
+
+.plan-time {
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------- 1日分の画面 */
+
+.day-page .page-header h1 {
+  min-width: 0;
+  font-size: 20px;
+}
+
+.day-section {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.plan {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  border-bottom: 1px solid var(--line);
+}
+
+.plan.done .plan-title {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.plan-time-input,
+.plan-title {
+  min-height: 32px;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  font-size: 15px;
+}
+
+.plan-time-input {
+  width: 6.2em;
+  flex: none;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.plan-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.plan-time-input:focus,
+.plan-title:focus {
+  outline: none;
+}
+
+.plan:focus-within {
+  border-bottom-color: var(--text);
+}
+
+.plan-plus {
+  width: 15px;
+  flex: none;
+  color: var(--muted);
+  text-align: center;
+}
+
+.plan.new {
+  border-bottom-style: dashed;
+}
+
+.day-entries {
+  display: flex;
+  flex-direction: column;
+}
+
+.day-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  color: inherit;
+  text-decoration: none;
+}
+
+.day-entry:hover .entry-title {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.day-section .btn.add {
+  align-self: flex-start;
+  margin: 6px 0 0 -10px;
+}
+
+/* 時刻の欄：時計の印は出さず、空のときは薄く */
+.plan-time-input::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
+.plan-time-input.empty {
+  opacity: 0.35;
+}
+
+.plan-time-input.empty:focus {
+  opacity: 1;
+}
+
+/* 1日分の画面の見出しは1行に収める */
+.day-page .page-header {
+  flex-wrap: nowrap;
+  gap: 2px;
+}
+
+.day-page .page-header h1 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin: 0 4px;
+}
+
+@media (max-width: 480px) {
+  .day-page .page-header h1 {
+    font-size: 17px;
+  }
+  .day-page .page-header .btn.back {
+    padding: 0 6px 0 10px;
+  }
 }

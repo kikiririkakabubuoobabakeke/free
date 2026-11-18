@@ -2,6 +2,8 @@ import type { Driver } from "./driver";
 import {
   TAG_COLORS,
   type AttachmentMeta,
+  type DayStat,
+  type Plan,
   type Entry,
   type EntryDetail,
   type EntrySummary,
@@ -776,6 +778,103 @@ export class Repo {
     const map = new Map<string, string[]>();
     for (const r of rows) map.set(r.to_tag, [...(map.get(r.to_tag) ?? []), r.from_tag]);
     return map;
+  }
+
+  // ---------------------------------------------------------------- カレンダー
+
+  /**
+   * from〜to（YYYY-MM-DD、両端を含む）の日ごとの日記の数と文字数。日記の無い日は入らない。
+   * 日は一覧と同じ「並べる日」（付けた日付、無ければ作成した日）で数える。
+   */
+  async dayStats(from: string, to: string): Promise<Map<string, DayStat>> {
+    const rows = await this.db.all<{ day: string; entries: number; chars: number }>(
+      `SELECT day, COUNT(*) AS entries, SUM(chars) AS chars FROM (
+         SELECT ${DAY} AS day,
+                length(replace(replace(e.title || e.body, char(10), ''), char(13), '')) AS chars
+         FROM entries e ${META_JOIN}
+         WHERE e.deleted = 0 AND m.trashed_at IS NULL
+       ) WHERE day BETWEEN ? AND ? GROUP BY day`,
+      [from, to],
+    );
+    return new Map(rows.map((r) => [r.day, { entries: r.entries, chars: r.chars ?? 0 }]));
+  }
+
+  /** 日記を書いた日（新しい順）。続けて書いている日数を数えるのに使う。 */
+  async writtenDays(): Promise<string[]> {
+    const rows = await this.db.all<{ day: string }>(
+      `SELECT DISTINCT ${DAY} AS day FROM entries e ${META_JOIN}
+       WHERE e.deleted = 0 AND m.trashed_at IS NULL ORDER BY day DESC`,
+    );
+    return rows.map((r) => r.day);
+  }
+
+  /** その日に並ぶ日記（一覧と同じ形。ゴミ箱の中は除く） */
+  async entriesOnDay(day: string): Promise<EntrySummary[]> {
+    const rows = await this.db.all<EntryRow>(
+      `SELECT * FROM (
+         SELECT e.id, e.date, ${DAY} AS day, e.title, substr(e.body, 1, ${EXCERPT_LENGTH}) AS body,
+                e.created_at, e.updated_at, ${META_COLS}
+         FROM entries e ${META_JOIN} WHERE e.deleted = 0 AND m.trashed_at IS NULL
+       ) WHERE day = ? ORDER BY created_at`,
+      [day],
+    );
+    return this.summarize(rows.map(toEntry));
+  }
+
+  // ---------------------------------------------------------------- 予定
+
+  async createPlan(date: string, plan: { time?: string; title?: string } = {}): Promise<string> {
+    const id = uid();
+    const t = now();
+    await this.db.run(
+      `INSERT INTO plans (id, date, time, title, done, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, ?)`,
+      [id, date, plan.time ?? "", plan.title ?? "", t, t],
+    );
+    this.onChange();
+    return id;
+  }
+
+  async updatePlan(id: string, patch: Partial<Omit<Plan, "id">>): Promise<void> {
+    const sets: string[] = [];
+    const params: unknown[] = [];
+    for (const key of ["date", "time", "title"] as const) {
+      if (patch[key] !== undefined) {
+        sets.push(`${key} = ?`);
+        params.push(patch[key]);
+      }
+    }
+    if (patch.done !== undefined) {
+      sets.push(`done = ?`);
+      params.push(patch.done ? 1 : 0);
+    }
+    if (!sets.length) return;
+    await this.db.run(`UPDATE plans SET ${sets.join(", ")}, updated_at = ?, dirty = 1 WHERE id = ?`, [
+      ...params,
+      now(),
+      id,
+    ]);
+    this.onChange();
+  }
+
+  /** 予定を消す（restorePlan で元に戻せる） */
+  async deletePlan(id: string): Promise<void> {
+    await this.db.run(`UPDATE plans SET deleted = 1, updated_at = ?, dirty = 1 WHERE id = ?`, [now(), id]);
+    this.onChange();
+  }
+
+  async restorePlan(id: string): Promise<void> {
+    await this.db.run(`UPDATE plans SET deleted = 0, updated_at = ?, dirty = 1 WHERE id = ?`, [now(), id]);
+    this.onChange();
+  }
+
+  /** from〜to（両端を含む）の予定。日付、時刻（終日が先）、作った順。 */
+  async listPlans(from: string, to: string): Promise<Plan[]> {
+    const rows = await this.db.all<Omit<Plan, "done"> & { done: number }>(
+      `SELECT id, date, time, title, done FROM plans
+       WHERE deleted = 0 AND date BETWEEN ? AND ? ORDER BY date, time, created_at`,
+      [from, to],
+    );
+    return rows.map((r) => ({ ...r, done: !!r.done }));
   }
 
   // ---------------------------------------------------------------- 写真

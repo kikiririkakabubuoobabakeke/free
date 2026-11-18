@@ -110,6 +110,21 @@ const MIGRATIONS: string[][] = [
       dirty INTEGER NOT NULL DEFAULT 1
     )`,
   ],
+  [
+    // 予定。date は YYYY-MM-DD、time は "HH:MM" か空文字（終日）。
+    `CREATE TABLE plans (
+      id TEXT PRIMARY KEY,
+      date TEXT NOT NULL,
+      time TEXT NOT NULL DEFAULT '',
+      title TEXT NOT NULL DEFAULT '',
+      done INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      deleted INTEGER NOT NULL DEFAULT 0,
+      dirty INTEGER NOT NULL DEFAULT 1
+    )`,
+    `CREATE INDEX plans_date ON plans(date)`,
+  ],
 ];
 
 export async function migrate(db: Driver): Promise<void> {

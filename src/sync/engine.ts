@@ -31,6 +31,7 @@ export const TABLES: TableSpec[] = [
     cols: ["entry_id", "mime", "width", "height", "position", "created_at"],
   },
   { kind: "entry_meta", table: "entry_meta", cols: ["locked", "trashed_at"] },
+  { kind: "plan", table: "plans", cols: ["date", "time", "title", "done", "created_at"] },
 ];
 
 const BY_KIND = new Map(TABLES.map((t) => [t.kind, t]));

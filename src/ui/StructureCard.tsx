@@ -25,7 +25,7 @@ export function StructureCard(props: {
   const [values, setValues, flushValues] = useDraft(s.values, (v) => repo.updateStructure(s.id, { values: v }));
 
   return (
-    <section className="structure">
+    <section className={`structure${editing ? " editing" : ""}`}>
       <header className="structure-head">
         <input
           className="structure-name"
@@ -37,17 +37,21 @@ export function StructureCard(props: {
         />
         {!readOnly && (
           <span className="structure-actions">
-            <button type="button" className="btn ghost icon" disabled={props.isFirst} onClick={() => void repo.moveStructure(s.id, -1)} aria-label="上へ">
-              ↑
-            </button>
-            <button type="button" className="btn ghost icon" disabled={props.isLast} onClick={() => void repo.moveStructure(s.id, 1)} aria-label="下へ">
-              ↓
-            </button>
+            {!editing && (
+              <>
+                <button type="button" className="btn ghost icon" disabled={props.isFirst} onClick={() => void repo.moveStructure(s.id, -1)} aria-label="上へ">
+                  ↑
+                </button>
+                <button type="button" className="btn ghost icon" disabled={props.isLast} onClick={() => void repo.moveStructure(s.id, 1)} aria-label="下へ">
+                  ↓
+                </button>
+              </>
+            )}
             <button
               type="button"
-              className={`btn small${editing ? " primary" : ""}`}
+              className="btn ghost small"
               onClick={() => {
-                if (editing) flushFields();
+                if (editing) void flushFields();
                 setEditing(!editing);
               }}
             >
@@ -63,37 +67,37 @@ export function StructureCard(props: {
           <div className="structure-foot">
             <button
               type="button"
-              className="btn small"
+              className="btn ghost small"
               onClick={async () => {
                 // 打ちかけの入力を先に保存し、それが終わってから写し取る
-                flushName();
-                flushFields();
-                flushValues();
+                void flushName();
+                void flushFields();
+                void flushValues();
                 await repo.updateStructure(s.id, {});
                 if (await repo.saveStructureAsTemplate(s.id)) toast(`テンプレ「${name || "無題"}」を保存しました`);
               }}
             >
               テンプレとして保存
             </button>
-            <ConfirmButton label="この構造を外す" confirmLabel="外す" className="btn small ghost" onConfirm={() => void repo.removeStructure(s.id)} />
+            <ConfirmButton label="この構造を外す" confirmLabel="外す" className="btn ghost small" onConfirm={() => void repo.removeStructure(s.id)} />
           </div>
         </>
-      ) : fields.length === 0 ? (
-        null
       ) : (
-        <div className="structure-fields">
-          {fields.map((f) => (
-            <label className="field" key={f.id}>
-              <span className="field-label">{f.label || "—"}</span>
-              <FieldInput
-                field={f}
-                value={values[f.id]}
-                disabled={readOnly}
-                onChange={(v) => setValues({ ...values, [f.id]: v })}
-              />
-            </label>
-          ))}
-        </div>
+        fields.length > 0 && (
+          <div className="structure-fields">
+            {fields.map((f) => (
+              <label className={`field field-${f.type}`} key={f.id}>
+                <span className="field-label">{f.label || "—"}</span>
+                <FieldInput
+                  field={f}
+                  value={values[f.id]}
+                  disabled={readOnly}
+                  onChange={(v) => setValues({ ...values, [f.id]: v })}
+                />
+              </label>
+            ))}
+          </div>
+        )
       )}
 
       <TagPicker

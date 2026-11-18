@@ -6,6 +6,8 @@ export type Route =
   | { page: "tags" }
   | { page: "templates" }
   | { page: "trash" }
+  | { page: "calendar" }
+  | { page: "day"; date: string }
   | { page: "settings" };
 
 function parse(hash: string): Route {
@@ -14,6 +16,8 @@ function parse(hash: string): Route {
   if (parts[0] === "tags") return { page: "tags" };
   if (parts[0] === "templates") return { page: "templates" };
   if (parts[0] === "trash") return { page: "trash" };
+  if (parts[0] === "calendar") return { page: "calendar" };
+  if (parts[0] === "day" && /^\d{4}-\d{2}-\d{2}$/.test(parts[1] ?? "")) return { page: "day", date: parts[1] };
   if (parts[0] === "settings") return { page: "settings" };
   return { page: "list" };
 }

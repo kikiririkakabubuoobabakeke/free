@@ -1,6 +1,8 @@
 import { Toasts } from "./bits";
+import { DayPage } from "./DayPage";
 import { Editor } from "./Editor";
-import { EntryList, newEntry } from "./EntryList";
+import { HomePage } from "./HomePage";
+import { EntryList } from "./EntryList";
 import { useRoute } from "./router";
 import { SettingsPage } from "./SettingsPage";
 import { TagsPage } from "./TagsPage";
@@ -21,13 +23,10 @@ export function AppShell() {
         {route.page === "templates" && <TemplatesPage />}
         {route.page === "trash" && <TrashPage />}
         {route.page === "settings" && <SettingsPage />}
-        {route.page === "list" && (
-          <div className="empty">
-            <button type="button" className="btn primary" onClick={() => void newEntry()}>
-              ＋ 新しい日記
-            </button>
-          </div>
-        )}
+        {/* 広い画面では、一覧の横に総合ページを出す */}
+        {route.page === "list" && <HomePage />}
+        {route.page === "calendar" && <HomePage standalone />}
+        {route.page === "day" && <DayPage key={route.date} date={route.date} />}
       </main>
       <Toasts />
     </div>

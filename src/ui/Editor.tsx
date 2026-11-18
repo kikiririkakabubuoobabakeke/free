@@ -211,10 +211,10 @@ function EditorBody(props: { entry: EntryDetail; allTags: TagInfo[]; templates: 
 
       {!readOnly && (
         <div className="editor-add">
-          <button type="button" className={`btn${adding ? " primary" : ""}`} onClick={() => setAdding(!adding)}>
+          <button type="button" className={`btn ghost small${adding ? " on" : ""}`} onClick={() => setAdding(!adding)}>
             ＋ 構造を付ける
           </button>
-          <button type="button" className="btn" onClick={() => fileInput.current?.click()}>
+          <button type="button" className="btn ghost small" onClick={() => fileInput.current?.click()}>
             ＋ 写真
           </button>
           <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(e) => void addPhotos(e.target.files)} />
