@@ -1726,3 +1726,323 @@ textarea.input {
     padding: 0 6px 0 10px;
   }
 }
+
+/* ---------------------------------------------------------------- ローカルLLMの分析 */
+
+:root {
+  /* 気分の色。沈んでいる＝淡い青、ふつう＝地の色に近い、良い＝差し色の赤の側。 */
+  --mood-m2: #a9c4e8;
+  --mood-m1: #d5e3f5;
+  --mood-z: #efe7e3;
+  --mood-p1: #f8d5d7;
+  --mood-p2: #ec9fa5;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --mood-m2: #3f5878;
+    --mood-m1: #34404f;
+    --mood-z: #3a3336;
+    --mood-p1: #57383d;
+    --mood-p2: #8f4f58;
+  }
+}
+
+.calendar-cell.md-m2,
+.legend-cell.md-m2 {
+  background: var(--mood-m2);
+}
+
+.calendar-cell.md-m1,
+.legend-cell.md-m1 {
+  background: var(--mood-m1);
+}
+
+.calendar-cell.md-z,
+.legend-cell.md-z {
+  background: var(--mood-z);
+}
+
+.calendar-cell.md-p1,
+.legend-cell.md-p1 {
+  background: var(--mood-p1);
+}
+
+.calendar-cell.md-p2,
+.legend-cell.md-p2 {
+  background: var(--mood-p2);
+}
+
+.mood-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  border-radius: 99px;
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: nowrap;
+}
+
+.mood-pill.mood-m2 {
+  background: var(--mood-m2);
+}
+
+.mood-pill.mood-m1 {
+  background: var(--mood-m1);
+}
+
+.mood-pill.mood-z {
+  background: var(--mood-z);
+}
+
+.mood-pill.mood-p1 {
+  background: var(--mood-p1);
+}
+
+.mood-pill.mood-p2 {
+  background: var(--mood-p2);
+}
+
+/* 色分けの切り替え（文字数／気分） */
+.segmented {
+  display: inline-flex;
+  margin-right: 10px;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+}
+
+.segmented button {
+  min-height: 24px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.segmented button[aria-pressed="true"] {
+  background: var(--raised);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+/* 今月よく出た感情 */
+.summary-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.emotion-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 13px;
+}
+
+.emotion {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.emotion-count {
+  margin-left: 3px;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 日記の画面の分析の欄：構造より一段控えめに、破線でまとめる */
+.analysis {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 2px 0 2px 14px;
+  border-left: 1px dashed var(--line);
+}
+
+.analysis-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 26px;
+}
+
+.analysis-head .btn {
+  min-height: 24px;
+  font-size: 12px;
+}
+
+.analysis-name {
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.analysis-summary {
+  color: var(--text);
+  font-size: 14.5px;
+  line-height: 1.7;
+}
+
+.analysis-facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+
+.analysis-facts .topics {
+  font-size: 12.5px;
+}
+
+.ideas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.idea {
+  display: inline-flex;
+  align-items: center;
+  border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--line));
+  border-radius: 99px;
+  background: var(--surface);
+}
+
+.idea-add {
+  padding: 2px 4px 2px 10px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.idea-add:hover {
+  color: var(--accent-strong);
+}
+
+.idea-x {
+  padding: 2px 8px 2px 4px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* 1日分の画面の、まとめと気分 */
+.day-entry-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.day-entry-summary .mood-pill {
+  flex: none;
+}
+
+/* 総合ページの振り返り */
+.review {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.review-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.review-head h2 {
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.review-nav {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+}
+
+.review-week {
+  min-width: 8.5em;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.review-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 16px 18px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.review-body h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.review-body p {
+  line-height: 1.9;
+}
+
+.review-mood {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.review-highlights {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13.5px;
+}
+
+.review-highlights li {
+  display: flex;
+  gap: 10px;
+}
+
+.review-date {
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent-strong);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+/* 設定のローカルLLM */
+.context-input {
+  max-width: 9em;
+}
+
+.llm-enable {
+  min-height: 28px;
+}
+
+.llm-note {
+  overflow-wrap: anywhere;
+}

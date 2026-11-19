@@ -3,6 +3,7 @@ import { SYNC_ENABLED } from "../config";
 import { isTauri } from "../db/driver";
 import { PageHeader } from "./bits";
 import { formatTime } from "./format";
+import { LlmSection } from "./LlmSection";
 import { getSync, useSyncState } from "./store";
 
 export function SettingsPage() {
@@ -10,6 +11,7 @@ export function SettingsPage() {
     <div className="page">
       <PageHeader title="設定" />
       {SYNC_ENABLED && <SyncSection />}
+      <LlmSection />
       <StorageSection />
     </div>
   );

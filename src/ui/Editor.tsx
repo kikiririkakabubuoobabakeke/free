@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { EntryDetail, TagInfo, Template } from "../db/types";
+import { AnalysisPanel } from "./AnalysisPanel";
 import { AutoTextarea, ConfirmButton, LockIcon, toast } from "./bits";
 import { dayOf, formatDate, formatDateTime, trashRemaining } from "./format";
 import { prepareImage } from "./image";
@@ -249,6 +250,8 @@ function EditorBody(props: { entry: EntryDetail; allTags: TagInfo[]; templates: 
           </button>
         </div>
       )}
+
+      <AnalysisPanel entry={entry} />
 
       {viewing && (
         <Lightbox

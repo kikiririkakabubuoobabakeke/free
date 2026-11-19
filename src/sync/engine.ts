@@ -32,6 +32,30 @@ export const TABLES: TableSpec[] = [
   },
   { kind: "entry_meta", table: "entry_meta", cols: ["locked", "trashed_at"] },
   { kind: "plan", table: "plans", cols: ["date", "time", "title", "done", "created_at"] },
+  {
+    kind: "analysis",
+    table: "analyses",
+    cols: [
+      "source_hash",
+      "content_at",
+      "model",
+      "summary",
+      "mood",
+      "emotions",
+      "topics",
+      "tag_ideas",
+      "plan_ideas",
+      "dismissed",
+      "analyzed_at",
+    ],
+    json: ["emotions", "topics", "tag_ideas", "plan_ideas", "dismissed"],
+  },
+  {
+    kind: "review",
+    table: "reviews",
+    cols: ["period_start", "period_end", "source_hash", "model", "title", "body", "mood_note", "highlights", "created_at"],
+    json: ["highlights"],
+  },
 ];
 
 const BY_KIND = new Map(TABLES.map((t) => [t.kind, t]));

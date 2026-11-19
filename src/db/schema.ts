@@ -125,6 +125,43 @@ const MIGRATIONS: string[][] = [
     )`,
     `CREATE INDEX plans_date ON plans(date)`,
   ],
+  [
+    // ローカルLLMによる日記ごとの分析。id は日記の id と同じ。日記の中身からいつでも作り直せる、派生した値。
+    // content_at は分析した時点の「日記の中身の更新時刻」。日記の方が新しければ、分析し直す対象になる。
+    `CREATE TABLE analyses (
+      id TEXT PRIMARY KEY,
+      source_hash TEXT NOT NULL DEFAULT '',
+      content_at INTEGER NOT NULL DEFAULT 0,
+      model TEXT NOT NULL DEFAULT '',
+      summary TEXT NOT NULL DEFAULT '',
+      mood INTEGER,
+      emotions TEXT NOT NULL DEFAULT '[]',
+      topics TEXT NOT NULL DEFAULT '[]',
+      tag_ideas TEXT NOT NULL DEFAULT '[]',
+      plan_ideas TEXT NOT NULL DEFAULT '[]',
+      dismissed TEXT NOT NULL DEFAULT '[]',
+      analyzed_at INTEGER NOT NULL DEFAULT 0,
+      updated_at INTEGER NOT NULL,
+      deleted INTEGER NOT NULL DEFAULT 0,
+      dirty INTEGER NOT NULL DEFAULT 1
+    )`,
+    // 週の振り返り。id は "week:週の始まりの日曜日"。
+    `CREATE TABLE reviews (
+      id TEXT PRIMARY KEY,
+      period_start TEXT NOT NULL,
+      period_end TEXT NOT NULL,
+      source_hash TEXT NOT NULL DEFAULT '',
+      model TEXT NOT NULL DEFAULT '',
+      title TEXT NOT NULL DEFAULT '',
+      body TEXT NOT NULL DEFAULT '',
+      mood_note TEXT NOT NULL DEFAULT '',
+      highlights TEXT NOT NULL DEFAULT '[]',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      deleted INTEGER NOT NULL DEFAULT 0,
+      dirty INTEGER NOT NULL DEFAULT 1
+    )`,
+  ],
 ];
 
 export async function migrate(db: Driver): Promise<void> {

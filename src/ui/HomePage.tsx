@@ -1,10 +1,23 @@
 import { useState } from "react";
 import type { Plan } from "../db/types";
+import { moodClass } from "./AnalysisPanel";
 import { PageHeader } from "./bits";
 import { addDays, level, streak, todayString, weekStart } from "./days";
 import { dayOf, formatDate } from "./format";
 import { go } from "./router";
-import { getApp, useQuery } from "./store";
+import { ReviewSection } from "./ReviewSection";
+import { getApp, useAnalysisState, useQuery } from "./store";
+
+type CalendarMode = "chars" | "mood";
+const MODE_KEY = "nikki.calendarMode";
+
+function loadMode(): CalendarMode {
+  try {
+    return localStorage.getItem(MODE_KEY) === "mood" ? "mood" : "chars";
+  } catch {
+    return "chars";
+  }
+}
 
 /** 今週の前後に出す週の数 */
 const WEEKS_AROUND = 4;
@@ -20,12 +33,27 @@ export function HomePage({ standalone }: { standalone?: boolean }) {
   const center = addDays(weekStart(today), shift * 7);
   const from = addDays(center, -WEEKS_AROUND * 7);
   const to = addDays(center, (WEEKS_AROUND + 1) * 7 - 1);
+  const { repo } = getApp();
+  const analysis = useAnalysisState();
+  const moods = useQuery(() => repo.moodByDay(from, to), [from, to]);
+  const [modeState, setModeState] = useState<CalendarMode>(loadMode);
+  // 気分で色分けできるのは、ローカルLLMを使っているか、気分の分析が1件でもあるとき
+  const canMood = (analysis.config.enabled && !!analysis.config.url) || (moods?.size ?? 0) > 0;
+  const mode: CalendarMode = canMood ? modeState : "chars";
+  const setMode = (m: CalendarMode) => {
+    setModeState(m);
+    try {
+      localStorage.setItem(MODE_KEY, m);
+    } catch {
+      // 覚えられなくても、表示は切り替わる
+    }
+  };
 
   return (
     <div className="page home">
       {standalone ? <PageHeader title="カレンダー" /> : null}
       <Summary today={today} />
-      <Calendar from={from} to={to} today={today} centerWeek={center} />
+      <Calendar from={from} to={to} today={today} centerWeek={center} mode={mode} moods={moods} />
       <div className="calendar-nav">
         <button type="button" className="btn ghost small" onClick={() => setShift(shift - WEEKS_AROUND)} aria-label="前へ">
           ↑ 前
@@ -37,15 +65,36 @@ export function HomePage({ standalone }: { standalone?: boolean }) {
           ↓ 次
         </button>
         <span className="spacer" />
-        <span className="legend" aria-hidden="true">
-          少
-          {[1, 2, 3, 4].map((lv) => (
-            <span key={lv} className={`legend-cell lv${lv}`} />
-          ))}
-          多
-        </span>
+        {canMood && (
+          <span className="segmented" role="group" aria-label="カレンダーの色分け">
+            <button type="button" aria-pressed={mode === "chars"} onClick={() => setMode("chars")}>
+              文字数
+            </button>
+            <button type="button" aria-pressed={mode === "mood"} onClick={() => setMode("mood")}>
+              気分
+            </button>
+          </span>
+        )}
+        {mode === "chars" ? (
+          <span className="legend" aria-hidden="true">
+            少
+            {[1, 2, 3, 4].map((lv) => (
+              <span key={lv} className={`legend-cell lv${lv}`} />
+            ))}
+            多
+          </span>
+        ) : (
+          <span className="legend" aria-hidden="true">
+            沈
+            {["m2", "m1", "z", "p1", "p2"].map((m) => (
+              <span key={m} className={`legend-cell md-${m}`} />
+            ))}
+            良
+          </span>
+        )}
       </div>
       <Upcoming today={today} />
+      <ReviewSection today={today} />
     </div>
   );
 }
@@ -55,9 +104,11 @@ function Summary({ today }: { today: string }) {
   const monthStart = `${today.slice(0, 7)}-01`;
   const days = useQuery(() => repo.writtenDays(), []);
   const month = useQuery(() => repo.dayStats(monthStart, today), [monthStart, today]);
+  const emotions = useQuery(() => repo.emotionCounts(monthStart, today), [monthStart, today]);
   if (!days || !month) return <div className="summary" />;
   const chars = [...month.values()].reduce((sum, d) => sum + d.chars, 0);
   return (
+    <div className="summary-wrap">
     <div className="summary">
       <div>
         <span className="summary-label">連続</span>
@@ -74,10 +125,28 @@ function Summary({ today }: { today: string }) {
         <span className="summary-label">字</span>
       </div>
     </div>
+    {emotions && emotions.length > 0 && (
+      <div className="emotion-summary" aria-label="今月よく出た感情">
+        {emotions.slice(0, 5).map((e) => (
+          <span key={e.emotion} className="emotion">
+            {e.emotion}
+            <span className="emotion-count">{e.count}</span>
+          </span>
+        ))}
+      </div>
+    )}
+    </div>
   );
 }
 
-function Calendar(props: { from: string; to: string; today: string; centerWeek: string }) {
+function Calendar(props: {
+  from: string;
+  to: string;
+  today: string;
+  centerWeek: string;
+  mode: CalendarMode;
+  moods: Map<string, { mood: number; entries: number }> | undefined;
+}) {
   const { repo } = getApp();
   const stats = useQuery(() => repo.dayStats(props.from, props.to), [props.from, props.to]);
   const plans = useQuery(() => repo.listPlans(props.from, props.to), [props.from, props.to]);
@@ -102,6 +171,7 @@ function Calendar(props: { from: string; to: string; today: string; centerWeek: 
         <div key={week[0]} role="row" className={`calendar-row${week[0] === props.centerWeek ? " center" : ""}`}>
           {week.map((day) => {
             const stat = stats?.get(day);
+            const mood = props.moods?.get(day);
             const dayPlans = plansByDay.get(day) ?? [];
             const open = dayPlans.filter((p) => !p.done);
             const d = Number(day.slice(8));
@@ -112,7 +182,7 @@ function Calendar(props: { from: string; to: string; today: string; centerWeek: 
                 role="gridcell"
                 className={[
                   "calendar-cell",
-                  `lv${level(stat?.chars ?? 0)}`,
+                  props.mode === "mood" ? (mood ? `md-${moodClass(mood.mood)}` : "lv0") : `lv${level(stat?.chars ?? 0)}`,
                   day === props.today ? "today" : "",
                   day > props.today ? "future" : "",
                 ].join(" ")}

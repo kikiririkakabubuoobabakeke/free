@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { openDriver } from "../db/driver";
+import { isTauri, openDriver } from "../db/driver";
 import { Repo } from "../db/repo";
 import { migrate } from "../db/schema";
+import type { Fetcher } from "../llm/client";
+import { AnalysisController, type AnalysisState } from "../llm/controller";
 import type { SyncController, SyncState } from "../sync/controller";
 
 /** 画面全体で共有するもの。起動時に1度だけ作る。 */
@@ -9,6 +11,20 @@ export interface App {
   repo: Repo;
   /** オフライン版では null */
   sync: SyncController | null;
+  /** ローカルLLMによる分析 */
+  analysis: AnalysisController;
+}
+
+/**
+ * LLM のサーバーと話すための fetch。
+ * アプリでは Rust 側で通信する（LAN 内の http のサーバーに、ブラウザの制約なしで届くように）。
+ */
+async function llmFetcher(): Promise<Fetcher> {
+  if (isTauri()) {
+    const { fetch } = await import("@tauri-apps/plugin-http");
+    return fetch;
+  }
+  return (input, init) => window.fetch(input, init);
 }
 
 let app: App | null = null;
@@ -32,16 +48,20 @@ export async function startApp(): Promise<App> {
     const { SyncController } = await import("../sync/controller");
     sync = new SyncController(db, bump);
   }
+  let analysis: AnalysisController | null = null;
   const repo = new Repo(db, () => {
     bump();
     sync?.requestSync();
+    analysis?.requestRun();
   });
-  app = { repo, sync };
+  analysis = new AnalysisController(repo, llmFetcher);
+  app = { repo, sync, analysis };
   // ゴミ箱に入れてから期限を過ぎたものを完全に削除する。起動時と、開いたままなら1時間ごと。
   await repo.purgeExpiredTrash();
   setInterval(() => void repo.purgeExpiredTrash(), 3_600_000);
   // 同期の準備は通信を伴うことがあるので、画面を出すのを待たせない
   void sync?.init();
+  analysis.init();
   return app;
 }
 
@@ -80,6 +100,11 @@ export function getSync(): SyncController {
   const { sync } = getApp();
   if (!sync) throw new Error("この版には同期の機能がありません");
   return sync;
+}
+
+export function useAnalysisState(): AnalysisState {
+  const { analysis } = getApp();
+  return useSyncExternalStore(analysis.subscribe, analysis.getState);
 }
 
 export function useSyncState(): SyncState {

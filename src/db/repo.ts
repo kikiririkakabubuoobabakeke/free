@@ -1,7 +1,11 @@
 import type { Driver } from "./driver";
 import {
   TAG_COLORS,
+  type Analysis,
+  type AnalysisResult,
   type AttachmentMeta,
+  type PlanIdea,
+  type Review,
   type DayStat,
   type Plan,
   type Entry,
@@ -16,7 +20,7 @@ import {
   type Template,
   TRASH_DAYS,
 } from "./types";
-import { chunk, likePattern, now, parseJson, structureSearchText, uid } from "./util";
+import { chunk, hashText, likePattern, now, parseJson, structureSearchText, uid } from "./util";
 
 interface StructureRow {
   id: string;
@@ -51,6 +55,15 @@ const EDITED_AT = `max(
     (l.target_type = 'structure' AND l.target_id IN (SELECT s.id FROM structures s WHERE s.entry_id = e.id))), 0)
 )`;
 
+/**
+ * 日記の「中身」を最後に変えた時刻。日付・題・本文と構造だけを見る（タグや写真、ロックは含めない）。
+ * 分析の結果がこれより古ければ、分析し直す対象になる。
+ */
+const CONTENT_AT = `max(
+  e.updated_at,
+  coalesce((SELECT max(s.updated_at) FROM structures s WHERE s.entry_id = e.id), 0)
+)`;
+
 /** 日記ごとの状態（ロック・ゴミ箱）。一覧などで entries e に LEFT JOIN して使う。 */
 const META_JOIN = `LEFT JOIN entry_meta m ON m.id = e.id AND m.deleted = 0`;
 const META_COLS = `coalesce(m.locked, 0) AS locked, m.trashed_at AS trashed_at`;
@@ -67,6 +80,53 @@ export class EntryLockedError extends Error {
     super(reason === "locked" ? "ロック中の日記は変更できません" : "ゴミ箱の中の日記は変更できません。先に元に戻してください");
     this.name = "EntryLockedError";
   }
+}
+
+/** 分析に渡す日記の中身 */
+export interface AnalysisSource {
+  id: string;
+  /** 並べる日（YYYY-MM-DD） */
+  day: string;
+  title: string;
+  body: string;
+  structures: { name: string; fields: { label: string; value: string }[] }[];
+  /** 日記と、その構造に付いているタグの名前 */
+  tags: string[];
+  content_at: number;
+}
+
+/** 振り返りに渡す、1週間分の日記と分析 */
+export interface WeekEntry {
+  id: string;
+  day: string;
+  title: string;
+  body: string;
+  content_at: number;
+  /** 分析が済んでいて、その後に書き換えられていなければ true */
+  analyzed: boolean;
+  summary: string;
+  mood: number | null;
+  emotions: string[];
+  topics: string[];
+}
+
+/** 週の日記の並びと中身の更新時刻から作る指紋。振り返りを作った後に日記が変われば、値が変わる。 */
+export function weekSourceHash(entries: WeekEntry[]): string {
+  return hashText(JSON.stringify(entries.map((e) => [e.id, e.day, e.content_at])));
+}
+
+interface AnalysisRow {
+  id: string;
+  model: string;
+  summary: string;
+  mood: number | null;
+  emotions: string;
+  topics: string;
+  tag_ideas: string;
+  plan_ideas: string;
+  dismissed: string;
+  analyzed_at: number;
+  stale: number;
 }
 
 interface EntryRow extends Omit<Entry, "locked"> {
@@ -243,6 +303,7 @@ export class Repo {
       t,
       id,
     ]);
+    await this.db.run(`UPDATE analyses SET deleted = 1, updated_at = ?, dirty = 1 WHERE id = ? AND deleted = 0`, [t, id]);
     await this.db.run(`UPDATE entries SET deleted = 1, updated_at = ?, dirty = 1 WHERE id = ?`, [t, id]);
   }
 
@@ -875,6 +936,305 @@ export class Repo {
       [from, to],
     );
     return rows.map((r) => ({ ...r, done: !!r.done }));
+  }
+
+  // ---------------------------------------------------------------- ローカルLLMの分析
+
+  /**
+   * 分析し直す必要のある日記の id。新しい日のものが先。
+   * settledBefore より後に書き換えられたもの（まだ書いている途中かもしれないもの）は除く。
+   */
+  async analysisQueue(opts: { settledBefore: number; limit: number }): Promise<string[]> {
+    const rows = await this.db.all<{ id: string }>(
+      `SELECT e.id FROM entries e ${META_JOIN}
+       LEFT JOIN analyses a ON a.id = e.id AND a.deleted = 0
+       WHERE e.deleted = 0 AND m.trashed_at IS NULL
+         AND (a.id IS NULL OR a.content_at < ${CONTENT_AT})
+         AND ${CONTENT_AT} <= ?
+       ORDER BY ${DAY} DESC, e.created_at DESC LIMIT ?`,
+      [opts.settledBefore, opts.limit],
+    );
+    return rows.map((r) => r.id);
+  }
+
+  /** 分析がまだの日記（書いている途中のものも含む）の数 */
+  async analysisPending(): Promise<number> {
+    const rows = await this.db.all<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM entries e ${META_JOIN}
+       LEFT JOIN analyses a ON a.id = e.id AND a.deleted = 0
+       WHERE e.deleted = 0 AND m.trashed_at IS NULL AND (a.id IS NULL OR a.content_at < ${CONTENT_AT})`,
+    );
+    return rows[0]?.n ?? 0;
+  }
+
+  /** 分析に渡す日記の中身。ゴミ箱の中や、無い日記なら null。 */
+  async analysisSource(id: string): Promise<AnalysisSource | null> {
+    const rows = await this.db.all<{ id: string; day: string; title: string; body: string; content_at: number }>(
+      `SELECT e.id, ${DAY} AS day, e.title, e.body, ${CONTENT_AT} AS content_at
+       FROM entries e ${META_JOIN} WHERE e.id = ? AND e.deleted = 0 AND m.trashed_at IS NULL`,
+      [id],
+    );
+    if (!rows.length) return null;
+    const detail = await this.getEntry(id);
+    if (!detail) return null;
+    const tagNames = new Set<string>(detail.tags.map((t) => t.name));
+    const structures = detail.structures.map((st) => {
+      for (const t of st.tags) tagNames.add(t.name);
+      const fields: { label: string; value: string }[] = [];
+      for (const f of st.fields) {
+        const v = st.values[f.id];
+        if (v === null || v === undefined || v === "") continue;
+        let value: string;
+        if (f.type === "check") {
+          if (v !== true) continue;
+          value = "はい";
+        } else if (f.type === "rating") {
+          value = `${v} / 5`;
+        } else {
+          value = String(v);
+        }
+        fields.push({ label: f.label || "（名前なし）", value });
+      }
+      return { name: st.name, fields };
+    });
+    return { ...rows[0], structures, tags: [...tagNames] };
+  }
+
+  /** 分析の結果を保存する。日記の中身には触れないので、日記の「最終更新」は動かない。 */
+  async saveAnalysis(
+    id: string,
+    result: AnalysisResult,
+    meta: { sourceHash: string; contentAt: number; model: string },
+  ): Promise<void> {
+    const t = now();
+    await this.db.run(
+      `INSERT INTO analyses (id, source_hash, content_at, model, summary, mood, emotions, topics, tag_ideas, plan_ideas,
+                             dismissed, analyzed_at, updated_at, deleted, dirty)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', ?, ?, 0, 1)
+       ON CONFLICT(id) DO UPDATE SET
+         source_hash = excluded.source_hash, content_at = excluded.content_at, model = excluded.model,
+         summary = excluded.summary, mood = excluded.mood, emotions = excluded.emotions, topics = excluded.topics,
+         tag_ideas = excluded.tag_ideas, plan_ideas = excluded.plan_ideas,
+         dismissed = CASE WHEN analyses.deleted = 1 THEN '[]' ELSE analyses.dismissed END,
+         analyzed_at = excluded.analyzed_at, updated_at = excluded.updated_at, deleted = 0, dirty = 1`,
+      [
+        id,
+        meta.sourceHash,
+        meta.contentAt,
+        meta.model,
+        result.summary,
+        result.mood,
+        JSON.stringify(result.emotions),
+        JSON.stringify(result.topics),
+        JSON.stringify(result.tag_ideas),
+        JSON.stringify(result.plan_ideas),
+        t,
+        t,
+      ],
+    );
+    this.onChange();
+  }
+
+  /** 前に分析したときの中身の指紋（無ければ null） */
+  async analysisHash(id: string): Promise<string | null> {
+    const rows = await this.db.all<{ source_hash: string }>(
+      `SELECT source_hash FROM analyses WHERE id = ? AND deleted = 0`,
+      [id],
+    );
+    return rows.length ? rows[0].source_hash : null;
+  }
+
+  /** 中身が前の分析と同じだったときに、分析し直さずに「確かめた時刻」だけ進める */
+  async touchAnalysis(id: string, contentAt: number): Promise<void> {
+    await this.db.run(
+      `UPDATE analyses SET content_at = ?, updated_at = ?, dirty = 1 WHERE id = ? AND deleted = 0`,
+      [contentAt, now(), id],
+    );
+    this.onChange();
+  }
+
+  async getAnalysis(id: string): Promise<Analysis | null> {
+    const rows = await this.db.all<AnalysisRow>(
+      `SELECT a.id, a.model, a.summary, a.mood, a.emotions, a.topics, a.tag_ideas, a.plan_ideas, a.dismissed,
+              a.analyzed_at, (a.content_at < ${CONTENT_AT}) AS stale
+       FROM analyses a JOIN entries e ON e.id = a.id
+       WHERE a.id = ? AND a.deleted = 0 AND e.deleted = 0`,
+      [id],
+    );
+    if (!rows.length) return null;
+    const r = rows[0];
+    return {
+      entry_id: r.id,
+      model: r.model,
+      summary: r.summary,
+      mood: r.mood,
+      emotions: parseJson<string[]>(r.emotions, []),
+      topics: parseJson<string[]>(r.topics, []),
+      tag_ideas: parseJson<string[]>(r.tag_ideas, []),
+      plan_ideas: parseJson<PlanIdea[]>(r.plan_ideas, []),
+      dismissed: parseJson<string[]>(r.dismissed, []),
+      analyzed_at: r.analyzed_at,
+      stale: !!r.stale,
+    };
+  }
+
+  /** 候補を「要らない」として外す（日記には触れない） */
+  async dismissIdea(id: string, key: string): Promise<void> {
+    const rows = await this.db.all<{ dismissed: string }>(
+      `SELECT dismissed FROM analyses WHERE id = ? AND deleted = 0`,
+      [id],
+    );
+    if (!rows.length) return;
+    const dismissed = new Set(parseJson<string[]>(rows[0].dismissed, []));
+    dismissed.add(key);
+    await this.db.run(`UPDATE analyses SET dismissed = ?, updated_at = ?, dirty = 1 WHERE id = ?`, [
+      JSON.stringify([...dismissed]),
+      now(),
+      id,
+    ]);
+    this.onChange();
+  }
+
+  /** 分析の結果（と、振り返り）をすべて捨てる。順に分析し直される。 */
+  async clearAnalyses(opts: { reviews?: boolean } = {}): Promise<void> {
+    const t = now();
+    await this.db.run(`UPDATE analyses SET deleted = 1, updated_at = ?, dirty = 1 WHERE deleted = 0`, [t]);
+    if (opts.reviews) await this.db.run(`UPDATE reviews SET deleted = 1, updated_at = ?, dirty = 1 WHERE deleted = 0`, [t]);
+    this.onChange();
+  }
+
+  /** from〜to の日ごとの気分の平均（分析が済んでいて、気分が読み取れた日記だけ） */
+  async moodByDay(from: string, to: string): Promise<Map<string, { mood: number; entries: number }>> {
+    const rows = await this.db.all<{ day: string; mood: number; n: number }>(
+      `SELECT day, AVG(mood) AS mood, COUNT(*) AS n FROM (
+         SELECT ${DAY} AS day, a.mood AS mood FROM entries e ${META_JOIN}
+         JOIN analyses a ON a.id = e.id AND a.deleted = 0
+         WHERE e.deleted = 0 AND m.trashed_at IS NULL AND a.mood IS NOT NULL
+       ) WHERE day BETWEEN ? AND ? GROUP BY day`,
+      [from, to],
+    );
+    return new Map(rows.map((r) => [r.day, { mood: r.mood, entries: r.n }]));
+  }
+
+  /** from〜to の日記に出てきた感情と、その回数（多い順） */
+  async emotionCounts(from: string, to: string): Promise<{ emotion: string; count: number }[]> {
+    const rows = await this.db.all<{ emotions: string }>(
+      `SELECT emotions FROM (
+         SELECT ${DAY} AS day, a.emotions AS emotions FROM entries e ${META_JOIN}
+         JOIN analyses a ON a.id = e.id AND a.deleted = 0
+         WHERE e.deleted = 0 AND m.trashed_at IS NULL
+       ) WHERE day BETWEEN ? AND ?`,
+      [from, to],
+    );
+    const counts = new Map<string, number>();
+    for (const r of rows) {
+      for (const e of new Set(parseJson<string[]>(r.emotions, []))) counts.set(e, (counts.get(e) ?? 0) + 1);
+    }
+    return [...counts]
+      .map(([emotion, count]) => ({ emotion, count }))
+      .sort((a, b) => b.count - a.count || a.emotion.localeCompare(b.emotion));
+  }
+
+  /** start〜end の日記と、その分析（振り返りの材料） */
+  async weekEntries(start: string, end: string): Promise<WeekEntry[]> {
+    const rows = await this.db.all<
+      Omit<WeekEntry, "analyzed" | "emotions" | "topics" | "summary"> & {
+        analyzed: number;
+        summary: string | null;
+        emotions: string | null;
+        topics: string | null;
+      }
+    >(
+      `SELECT * FROM (
+         SELECT e.id, ${DAY} AS day, e.title, e.body, e.created_at, ${CONTENT_AT} AS content_at,
+                (a.id IS NOT NULL AND a.content_at >= ${CONTENT_AT}) AS analyzed,
+                a.summary AS summary, a.mood AS mood, a.emotions AS emotions, a.topics AS topics
+         FROM entries e ${META_JOIN} LEFT JOIN analyses a ON a.id = e.id AND a.deleted = 0
+         WHERE e.deleted = 0 AND m.trashed_at IS NULL
+       ) WHERE day BETWEEN ? AND ? ORDER BY day, created_at`,
+      [start, end],
+    );
+    return rows.map((r) => ({
+      id: r.id,
+      day: r.day,
+      title: r.title,
+      body: r.body,
+      content_at: r.content_at,
+      analyzed: !!r.analyzed,
+      summary: r.summary ?? "",
+      mood: r.mood ?? null,
+      emotions: parseJson<string[]>(r.emotions, []),
+      topics: parseJson<string[]>(r.topics, []),
+    }));
+  }
+
+  /** 週の振り返り。作っていなければ null。 */
+  async getReview(start: string): Promise<Review | null> {
+    const rows = await this.db.all<{
+      id: string;
+      period_start: string;
+      period_end: string;
+      source_hash: string;
+      model: string;
+      title: string;
+      body: string;
+      mood_note: string;
+      highlights: string;
+      created_at: number;
+    }>(
+      `SELECT id, period_start, period_end, source_hash, model, title, body, mood_note, highlights, created_at
+       FROM reviews WHERE id = ? AND deleted = 0`,
+      [`week:${start}`],
+    );
+    if (!rows.length) return null;
+    const { source_hash, highlights, ...r } = rows[0];
+    const entries = await this.weekEntries(r.period_start, r.period_end);
+    return {
+      ...r,
+      highlights: parseJson<{ date: string; text: string }[]>(highlights, []),
+      stale: weekSourceHash(entries) !== source_hash,
+    };
+  }
+
+  /** いちばん新しい振り返りの週の始まり。1つも無ければ null。 */
+  async latestReviewStart(): Promise<string | null> {
+    const rows = await this.db.all<{ period_start: string }>(
+      `SELECT period_start FROM reviews WHERE deleted = 0 ORDER BY period_start DESC LIMIT 1`,
+    );
+    return rows.length ? rows[0].period_start : null;
+  }
+
+  async saveReview(
+    start: string,
+    end: string,
+    review: { title: string; body: string; mood_note: string; highlights: { date: string; text: string }[] },
+    meta: { sourceHash: string; model: string },
+  ): Promise<void> {
+    const t = now();
+    await this.db.run(
+      `INSERT INTO reviews (id, period_start, period_end, source_hash, model, title, body, mood_note, highlights,
+                            created_at, updated_at, deleted, dirty)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1)
+       ON CONFLICT(id) DO UPDATE SET
+         period_end = excluded.period_end, source_hash = excluded.source_hash, model = excluded.model,
+         title = excluded.title, body = excluded.body, mood_note = excluded.mood_note,
+         highlights = excluded.highlights, created_at = excluded.created_at, updated_at = excluded.updated_at,
+         deleted = 0, dirty = 1`,
+      [
+        `week:${start}`,
+        start,
+        end,
+        meta.sourceHash,
+        meta.model,
+        review.title,
+        review.body,
+        review.mood_note,
+        JSON.stringify(review.highlights),
+        t,
+        t,
+      ],
+    );
+    this.onChange();
   }
 
   // ---------------------------------------------------------------- 写真

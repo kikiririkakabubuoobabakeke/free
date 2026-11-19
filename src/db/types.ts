@@ -64,6 +64,88 @@ export interface DayStat {
   chars: number;
 }
 
+/** ローカルLLMが出す、予定の候補 */
+export interface PlanIdea {
+  date: string;
+  time: string;
+  title: string;
+}
+
+/** 日記ごとの分析の中身（LLMの出力を検めたもの） */
+export interface AnalysisResult {
+  /** 一言のまとめ */
+  summary: string;
+  /** 気分。-2（沈んでいる）〜 2（とても良い）。読み取れなければ null。 */
+  mood: number | null;
+  /** 感情（EMOTIONS の中から最大3つ） */
+  emotions: string[];
+  /** 話題（短い名詞、最大5つ） */
+  topics: string[];
+  /** 付けるとよさそうなタグの名前（最大3つ） */
+  tag_ideas: string[];
+  /** 日記から読み取れた、これからの予定（最大5つ） */
+  plan_ideas: PlanIdea[];
+}
+
+export interface Analysis extends AnalysisResult {
+  entry_id: string;
+  model: string;
+  analyzed_at: number;
+  /** 「要らない」と外した候補（"tag:名前" / "plan:日付 時刻 題"） */
+  dismissed: string[];
+  /** 分析した後に日記が書き換えられていれば true */
+  stale: boolean;
+}
+
+/** 週の振り返り */
+export interface Review {
+  id: string;
+  period_start: string;
+  period_end: string;
+  model: string;
+  title: string;
+  body: string;
+  /** 気分の流れについての一言 */
+  mood_note: string;
+  highlights: { date: string; text: string }[];
+  created_at: number;
+  /** 作った後に、その週の日記が書き換えられていれば true */
+  stale: boolean;
+}
+
+/** 気分を言葉にしたもの（-2〜2） */
+export const MOOD_LABELS: Record<string, string> = {
+  "-2": "沈んでいる",
+  "-1": "沈み気味",
+  "0": "ふつう",
+  "1": "良い",
+  "2": "とても良い",
+};
+
+/** 感情の語彙。集計できるよう、LLMにはこの中から選ばせる。 */
+export const EMOTIONS = [
+  "喜び",
+  "楽しさ",
+  "安心",
+  "感謝",
+  "達成感",
+  "期待",
+  "わくわく",
+  "穏やか",
+  "愛しさ",
+  "懐かしさ",
+  "疲れ",
+  "不安",
+  "緊張",
+  "悲しみ",
+  "寂しさ",
+  "怒り",
+  "苛立ち",
+  "退屈",
+  "後悔",
+  "焦り",
+] as const;
+
 /** ゴミ箱に入れた日記を、自動で完全に削除するまでの日数 */
 export const TRASH_DAYS = 30;
 

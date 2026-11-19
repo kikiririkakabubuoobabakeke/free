@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- macOS が「ローカルネットワーク上の機器へのアクセス」を確かめるときに出す説明。Tauri が生成する Info.plist に足される。 -->
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>同じネットワークにあるPCで動かしているLLMに、日記の分析を頼むために使います。</string>
+</dict>
+</plist>

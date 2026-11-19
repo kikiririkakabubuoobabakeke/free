@@ -1,5 +1,6 @@
 import { useState } from "react";
-import type { Plan } from "../db/types";
+import type { EntrySummary, Plan } from "../db/types";
+import { MoodPill } from "./AnalysisPanel";
 import { toast } from "./bits";
 import { freshEntries } from "./Editor";
 import { addDays, todayString } from "./days";
@@ -53,15 +54,9 @@ export function DayPage({ date }: { date: string }) {
       <section className="day-section">
         <h2>日記</h2>
         <div className="day-entries">
-          {(entries ?? []).map((e) => {
-            const firstLine = e.body.split("\n").find((line) => line.trim()) ?? "";
-            return (
-              <a key={e.id} className="day-entry" href={`#/e/${e.id}`}>
-                <span className="entry-title">{e.title.trim() || firstLine || "無題"}</span>
-                {e.title.trim() && firstLine && <span className="entry-excerpt">{e.body.trim()}</span>}
-              </a>
-            );
-          })}
+          {(entries ?? []).map((e) => (
+            <DayEntry key={e.id} entry={e} />
+          ))}
         </div>
         <button type="button" className="btn ghost small add" onClick={() => void writeEntry()}>
           ＋ この日の日記
@@ -137,5 +132,26 @@ function NewPlan({ date }: { date: string }) {
         追加
       </button>
     </div>
+  );
+}
+
+/** その日の日記の1行。分析があれば、一言のまとめと気分を添える。 */
+function DayEntry({ entry: e }: { entry: EntrySummary }) {
+  const { repo } = getApp();
+  const analysis = useQuery(() => repo.getAnalysis(e.id), [e.id]);
+  const firstLine = e.body.split("\n").find((line) => line.trim()) ?? "";
+  const summary = analysis?.summary ?? "";
+  return (
+    <a className="day-entry" href={`#/e/${e.id}`}>
+      <span className="entry-title">{e.title.trim() || firstLine || "無題"}</span>
+      {summary ? (
+        <span className="day-entry-summary">
+          {analysis?.mood !== null && analysis?.mood !== undefined && <MoodPill mood={analysis.mood} />}
+          <span className="entry-excerpt">{summary}</span>
+        </span>
+      ) : (
+        e.title.trim() && firstLine && <span className="entry-excerpt">{e.body.trim()}</span>
+      )}
+    </a>
   );
 }

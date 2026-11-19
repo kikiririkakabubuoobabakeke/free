@@ -1,7 +1,24 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "画面側に許す操作。ウィンドウの基本操作と、端末内SQLiteの読み書きだけ。",
-  "windows": ["main"],
-  "permissions": ["core:default", "sql:default", "sql:allow-execute"]
+  "description": "画面側に許す操作。ウィンドウの基本操作、端末内SQLiteの読み書き、自分のPCで動かすLLMのサーバーとの通信。",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "sql:default",
+    "sql:allow-execute",
+    {
+      "identifier": "http:default",
+      "allow": [
+        {
+          "url": "http://*:*"
+        },
+        {
+          "url": "https://*:*"
+        }
+      ]
+    }
+  ]
 }
