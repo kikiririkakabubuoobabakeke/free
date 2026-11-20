@@ -1,22 +1,21 @@
 /*
- * 色はパステル。差し色は、やや濃いめのパステルの赤（--accent）。
- * 白い文字を載せるボタンには、読みやすさのため少し締めた赤（--accent-strong）を使う。
+ * 色はモノトーン（無彩色）だけ。差し色も文字と同じ黒（暗い配色では白）。
  * 文字は Noto Sans JP（アプリに同梱）。
  */
 :root {
-  --bg: #fbf7f4;
-  --surface: #fffcfa;
+  --bg: #f4f4f4;
+  --surface: #fbfbfb;
   --raised: #ffffff;
-  --text: #3b3236;
-  --muted: #84787d;
-  --line: #efe4e1;
-  --accent: #d4606a;
-  --accent-strong: #c95560;
+  --text: #1c1c1c;
+  --muted: #6e6e6e;
+  --line: #e2e2e2;
+  --accent: #1c1c1c;
+  --accent-strong: #1c1c1c;
   --accent-text: #ffffff;
-  --accent-soft: #fbe6e6;
-  --danger: #c95560;
-  --ok: #6fae86;
-  --shadow: 0 1px 2px rgb(120 70 70 / 6%), 0 4px 16px rgb(120 70 70 / 6%);
+  --accent-soft: #e9e9e9;
+  --danger: #1c1c1c;
+  --ok: #1c1c1c;
+  --shadow: 0 1px 2px rgb(0 0 0 / 6%), 0 4px 16px rgb(0 0 0 / 6%);
   --sans: "Noto Sans JP Variable", "Noto Sans JP", sans-serif;
   --serif: var(--sans);
   --radius: 10px;
@@ -24,18 +23,18 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #1f1b1d;
-    --surface: #262124;
-    --raised: #2e282b;
-    --text: #f1e9ec;
-    --muted: #a99da2;
-    --line: #3d3438;
-    --accent: #ee8f97;
-    --accent-strong: #ee8f97;
-    --accent-text: #241c1f;
-    --accent-soft: #44292d;
-    --danger: #ee8f97;
-    --ok: #9fd3b0;
+    --bg: #161616;
+    --surface: #1e1e1e;
+    --raised: #262626;
+    --text: #ececec;
+    --muted: #949494;
+    --line: #353535;
+    --accent: #ececec;
+    --accent-strong: #ececec;
+    --accent-text: #161616;
+    --accent-soft: #2e2e2e;
+    --danger: #ececec;
+    --ok: #ececec;
     --shadow: 0 1px 2px rgb(0 0 0 / 30%), 0 4px 16px rgb(0 0 0 / 25%);
   }
 }
@@ -462,20 +461,22 @@ textarea.input {
   gap: 5px;
   max-width: 100%;
   padding: 1px 9px;
-  border: 1px solid color-mix(in srgb, var(--chip, var(--muted)) 50%, var(--surface));
+  border: 1px solid var(--line);
   border-radius: 99px;
-  background: color-mix(in srgb, var(--chip, var(--muted)) 22%, var(--surface));
+  background: var(--surface);
   font-size: 12.5px;
   line-height: 1.6;
   white-space: nowrap;
 }
 
+/* タグの色（灰色の濃淡）。淡い色も地に埋もれないよう輪郭を付ける */
 .chip-dot {
   width: 7px;
   height: 7px;
   flex: none;
   border-radius: 50%;
   background: var(--chip);
+  box-shadow: 0 0 0 1px var(--muted);
 }
 
 .chip.clickable {
@@ -1105,6 +1106,7 @@ textarea.input {
   height: 28px;
   border: 2px solid transparent;
   border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--line);
   cursor: pointer;
 }
 
@@ -1287,21 +1289,26 @@ textarea.input {
 /* ---------------------------------------------------------------- 総合ページ・カレンダー */
 
 :root {
-  /* 書いた量の濃さ。0 は書いていない日。差し色の赤の、淡いものから濃いものへ。 */
-  --lv1: #fbe3e3;
-  --lv2: #f5c3c6;
-  --lv3: #ea9ba1;
-  --lv4: #d4606a;
-  --lv-ink-dark: #ffffff;
+  /*
+   * 書いた量の濃さ。0 は書いていない日（地の色）。灰色の、淡いものから濃いものへ（見た目の明るさがほぼ等間隔）。
+   * --lv3-ink / --lv4-ink は、そのマスに載せる文字の色。
+   */
+  --lv1: #e2e2e2;
+  --lv2: #b8b8b8;
+  --lv3: #888888;
+  --lv4: #4a4a4a;
+  --lv3-ink: var(--text);
+  --lv4-ink: #ffffff;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --lv1: #3c2a2e;
-    --lv2: #5c363c;
-    --lv3: #9b5560;
-    --lv4: #ee8f97;
-    --lv-ink-dark: #241c1f;
+    --lv1: #323232;
+    --lv2: #4e4e4e;
+    --lv3: #828282;
+    --lv4: #c8c8c8;
+    --lv3-ink: #161616;
+    --lv4-ink: #161616;
   }
 }
 
@@ -1420,11 +1427,12 @@ textarea.input {
 
 .calendar-cell.lv3 {
   background: var(--lv3);
+  color: var(--lv3-ink);
 }
 
 .calendar-cell.lv4 {
   background: var(--lv4);
-  color: var(--lv-ink-dark);
+  color: var(--lv4-ink);
 }
 
 .calendar-cell.future .cell-day {
@@ -1435,8 +1443,13 @@ textarea.input {
   box-shadow: inset 0 0 0 2px var(--accent);
 }
 
+/* 濃いマスでは、今日の枠が地に埋もれないよう、内側に文字の色の枠、外側に差し色の枠を重ねる */
+.calendar-cell.today.lv3 {
+  box-shadow: inset 0 0 0 2px var(--lv3-ink), 0 0 0 2px var(--accent);
+}
+
 .calendar-cell.today.lv4 {
-  box-shadow: inset 0 0 0 2px var(--lv-ink-dark), 0 0 0 2px var(--accent);
+  box-shadow: inset 0 0 0 2px var(--lv4-ink), 0 0 0 2px var(--accent);
 }
 
 .cell-day {
@@ -1730,77 +1743,96 @@ textarea.input {
 /* ---------------------------------------------------------------- ローカルLLMの分析 */
 
 :root {
-  /* 気分の色。沈んでいる＝淡い青、ふつう＝地の色に近い、良い＝差し色の赤の側。 */
-  --mood-m2: #a9c4e8;
-  --mood-m1: #d5e3f5;
-  --mood-z: #efe7e3;
-  --mood-p1: #f8d5d7;
-  --mood-p2: #ec9fa5;
+  /*
+   * 気分の色（モノトーン）。良い側は塗りの濃さ、沈んだ側は右下がりの斜線の濃さで表す。
+   * ふつうは淡い灰色。斜線は、上に載る日付の文字が読める濃さまでにとどめる。
+   */
+  --mood-z: #e2e2e2;
+  --mood-p1: #a6a6a6;
+  --mood-p2: #4a4a4a;
+  --mood-p2-ink: #ffffff;
+  --mood-hatch-1: #b0b0b0;
+  --mood-hatch-2: #8a8a8a;
+  /* 凡例などの小さな見本の輪郭（斜線のマスの形が分かるように） */
+  --swatch-edge: rgb(0 0 0 / 12%);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --mood-m2: #3f5878;
-    --mood-m1: #34404f;
-    --mood-z: #3a3336;
-    --mood-p1: #57383d;
-    --mood-p2: #8f4f58;
+    --mood-z: #323232;
+    --mood-p1: #5e5e5e;
+    --mood-p2: #c8c8c8;
+    --mood-p2-ink: #161616;
+    --mood-hatch-1: #4a4a4a;
+    --mood-hatch-2: #6e6e6e;
+    --swatch-edge: rgb(255 255 255 / 14%);
   }
 }
 
 .calendar-cell.md-m2,
-.legend-cell.md-m2 {
-  background: var(--mood-m2);
+.legend-cell.md-m2,
+.mood-swatch.md-m2 {
+  background-color: var(--surface);
+  background-image: repeating-linear-gradient(45deg, var(--mood-hatch-2) 0 2px, transparent 2px 4.5px);
 }
 
 .calendar-cell.md-m1,
-.legend-cell.md-m1 {
-  background: var(--mood-m1);
+.legend-cell.md-m1,
+.mood-swatch.md-m1 {
+  background-color: var(--surface);
+  background-image: repeating-linear-gradient(45deg, var(--mood-hatch-1) 0 1.5px, transparent 1.5px 6px);
 }
 
 .calendar-cell.md-z,
-.legend-cell.md-z {
+.legend-cell.md-z,
+.mood-swatch.md-z {
   background: var(--mood-z);
 }
 
 .calendar-cell.md-p1,
-.legend-cell.md-p1 {
+.legend-cell.md-p1,
+.mood-swatch.md-p1 {
   background: var(--mood-p1);
 }
 
 .calendar-cell.md-p2,
-.legend-cell.md-p2 {
+.legend-cell.md-p2,
+.mood-swatch.md-p2 {
   background: var(--mood-p2);
 }
 
+.calendar-cell.md-p2 {
+  color: var(--mood-p2-ink);
+}
+
+.calendar-cell.today.md-p2 {
+  box-shadow: inset 0 0 0 2px var(--mood-p2-ink), 0 0 0 2px var(--accent);
+}
+
+.legend-cell[class*="md-"],
+.mood-swatch {
+  box-shadow: inset 0 0 0 1px var(--swatch-edge);
+}
+
+/* 気分の名前。名前の前に、カレンダーと同じ見本を置く */
 .mood-pill {
   display: inline-flex;
   align-items: center;
-  padding: 0 8px;
+  gap: 5px;
+  padding: 0 8px 0 6px;
+  border: 1px solid var(--line);
   border-radius: 99px;
+  background: var(--surface);
   font-size: 12px;
   line-height: 1.7;
   white-space: nowrap;
 }
 
-.mood-pill.mood-m2 {
-  background: var(--mood-m2);
-}
-
-.mood-pill.mood-m1 {
-  background: var(--mood-m1);
-}
-
-.mood-pill.mood-z {
-  background: var(--mood-z);
-}
-
-.mood-pill.mood-p1 {
-  background: var(--mood-p1);
-}
-
-.mood-pill.mood-p2 {
-  background: var(--mood-p2);
+.mood-swatch {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 2px;
 }
 
 /* 色分けの切り替え（文字数／気分） */

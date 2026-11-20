@@ -216,11 +216,15 @@ export interface TagInfo extends Tag {
   use_count: number;
 }
 
-/** タグの色。パステル（赤・橙・黄緑・青緑・青・紫・桃・灰）。 */
-export const TAG_COLORS = ["#e88a8f", "#f0b37a", "#a5cf8f", "#86cbbf", "#8eb6e6", "#b3a1e3", "#eaa0c8", "#b8b0b4"];
+/** タグの色。モノトーンの濃淡だけ（濃い→淡い。見た目の明るさがほぼ等間隔）。 */
+export const TAG_COLORS = ["#1d1d1d", "#333333", "#4a4a4a", "#626262", "#7b7b7b", "#959595", "#b0b0b0", "#cccccc"];
 
-/** 以前の版の色の並び。同じ位置のパステルの色で見せる。 */
+/**
+ * 以前の版の色の並び。同じ位置の濃淡で見せる（保存されている色は書き換えない）。
+ * パステルの版・最初の版・前のモノトーンの版（6段）。
+ */
 const OLD_TAG_COLORS = [
+  ["#e88a8f", "#f0b37a", "#a5cf8f", "#86cbbf", "#8eb6e6", "#b3a1e3", "#eaa0c8", "#b8b0b4"],
   ["#c2553f", "#c98a1b", "#5a8f3c", "#2f8f83", "#3b74c4", "#7a5cc4", "#b8508f", "#8a8f98"],
   ["#1c1c1c", "#3d3d3d", "#5e5e5e", "#7f7f7f", "#a0a0a0", "#c1c1c1"],
 ];
@@ -229,9 +233,11 @@ const OLD_TAG_COLORS = [
 export function tagColor(color: string): string {
   const c = color.toLowerCase();
   if (TAG_COLORS.includes(c)) return c;
+  const last = TAG_COLORS.length - 1;
   for (const old of OLD_TAG_COLORS) {
     const i = old.indexOf(c);
-    if (i >= 0) return TAG_COLORS[i % TAG_COLORS.length];
+    // 並びの長さが違っても、濃い側・淡い側の位置がそろうように割り当てる
+    if (i >= 0) return TAG_COLORS[Math.round((i * last) / (old.length - 1))];
   }
-  return TAG_COLORS[TAG_COLORS.length - 1];
+  return TAG_COLORS[last];
 }

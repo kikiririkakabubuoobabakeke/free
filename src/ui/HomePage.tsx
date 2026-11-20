@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Plan } from "../db/types";
-import { moodClass } from "./AnalysisPanel";
+import { moodClass, moodLabel } from "./AnalysisPanel";
 import { PageHeader } from "./bits";
 import { addDays, level, streak, todayString, weekStart } from "./days";
 import { dayOf, formatDate } from "./format";
@@ -186,7 +186,9 @@ function Calendar(props: {
                   day === props.today ? "today" : "",
                   day > props.today ? "future" : "",
                 ].join(" ")}
-                title={`${formatDate(day)}${stat ? ` ${stat.chars.toLocaleString()}字` : ""}${dayPlans.length ? ` 予定${dayPlans.length}件` : ""}`}
+                title={`${formatDate(day)}${stat ? ` ${stat.chars.toLocaleString()}字` : ""}${
+                  props.mode === "mood" && mood ? ` 気分：${moodLabel(mood.mood)}` : ""
+                }${dayPlans.length ? ` 予定${dayPlans.length}件` : ""}`}
                 onClick={() => go(`day/${day}`)}
               >
                 <span className="cell-day">{d === 1 ? `${Number(day.slice(5, 7))}/${d}` : d}</span>

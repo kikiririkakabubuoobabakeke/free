@@ -10,8 +10,19 @@ export function moodClass(mood: number): string {
   return r <= -2 ? "m2" : r === -1 ? "m1" : r === 0 ? "z" : r === 1 ? "p1" : "p2";
 }
 
+/** 気分（-2〜2、平均なら小数）の名前 */
+export function moodLabel(mood: number): string {
+  return MOOD_LABELS[String(Math.round(mood))] ?? "";
+}
+
+/** 気分の名前。前に、カレンダーと同じ見本（良い側は塗り、沈んだ側は斜線）を置く */
 export function MoodPill({ mood }: { mood: number }) {
-  return <span className={`mood-pill mood-${moodClass(mood)}`}>{MOOD_LABELS[String(Math.round(mood))]}</span>;
+  return (
+    <span className="mood-pill">
+      <span className={`mood-swatch md-${moodClass(mood)}`} aria-hidden="true" />
+      {moodLabel(mood)}
+    </span>
+  );
 }
 
 function planKey(p: PlanIdea): string {
