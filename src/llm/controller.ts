@@ -9,6 +9,7 @@ import {
   engineUrl,
   listLocalModels,
   pullModel,
+  RENAMED_MODELS,
   sameModel,
   startEngine,
   stopEngine,
@@ -57,7 +58,9 @@ export function loadConfig(raw: string | null): { config: LlmConfig; saved: bool
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<LlmConfig>;
       const mode = parsed.mode ?? (parsed.url ? "remote" : "builtin");
-      return { config: { ...DEFAULT_LLM_CONFIG, ...parsed, mode }, saved: true };
+      // 前の版の既定のモデル名は、Q4_K_M を明示した名前に読み替える
+      const model = RENAMED_MODELS[(parsed.model ?? "").trim()] ?? parsed.model ?? DEFAULT_LLM_CONFIG.model;
+      return { config: { ...DEFAULT_LLM_CONFIG, ...parsed, mode, model }, saved: true };
     }
   } catch {
     // 壊れた設定は無かったものとして扱う
@@ -81,7 +84,7 @@ export function effectiveModel(config: LlmConfig, engine: EngineInfo | null): st
 }
 
 /** ほかのPCのサーバーを使うときに、最初に入れておくモデル */
-export const DEFAULT_REMOTE_MODEL = "gemma4:26b";
+export const DEFAULT_REMOTE_MODEL = "gemma4:26b-a4b-it-q4_K_M";
 
 function isConfigured(config: LlmConfig, engine: EngineInfo | null): boolean {
   if (!config.enabled) return false;

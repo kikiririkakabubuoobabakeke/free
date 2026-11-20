@@ -148,7 +148,7 @@ function BuiltinSettings() {
           <input
             className="input"
             value={draft ?? model}
-            placeholder="gemma4:e4b"
+            placeholder="gemma4:e4b-it-q4_K_M"
             autoFocus={customOpen}
             disabled={!!pull}
             autoCapitalize="none"

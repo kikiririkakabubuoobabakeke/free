@@ -12,7 +12,7 @@ export interface LlmConfig {
   mode: "builtin" | "remote";
   /** remote のときのサーバー。例: http://192.168.1.20:11434 */
   url: string;
-  /** 例: gemma4:26b。空なら、このPCに合ったものを使う。 */
+  /** 例: gemma4:26b-a4b-it-q4_K_M。空なら、このPCに合ったものを使う。 */
   model: string;
   /** 分析を進めるか */
   enabled: boolean;

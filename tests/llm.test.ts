@@ -410,9 +410,9 @@ describe("同梱のエンジン", () => {
 
   it("Windows では 26B、Mac とそれ以外では E4B を最初に選ぶ", async () => {
     const { defaultModel, sameModel } = await import("../src/llm/engine");
-    expect(defaultModel("windows")).toBe("gemma4:26b");
-    expect(defaultModel("macos")).toBe("gemma4:e4b");
-    expect(defaultModel("linux")).toBe("gemma4:e4b");
+    expect(defaultModel("windows")).toBe("gemma4:26b-a4b-it-q4_K_M");
+    expect(defaultModel("macos")).toBe("gemma4:e4b-it-q4_K_M");
+    expect(defaultModel("linux")).toBe("gemma4:e4b-it-q4_K_M");
     expect(sameModel("gemma4", "gemma4:latest")).toBe(true);
     expect(sameModel("GEMMA4:E4B", "gemma4:e4b")).toBe(true);
     expect(sameModel("gemma4:e4b", "gemma4:26b")).toBe(false);
@@ -421,12 +421,16 @@ describe("同梱のエンジン", () => {
   it("前の版の設定は、URL があれば「ほかのPCのサーバー」として引き継ぐ", async () => {
     const { loadConfig, effectiveModel } = await import("../src/llm/controller");
     const old = loadConfig(JSON.stringify({ url: "http://192.168.1.20:11434", model: "gemma4:26b", enabled: true, contextLength: 8192 }));
-    expect(old.config).toMatchObject({ mode: "remote", url: "http://192.168.1.20:11434", model: "gemma4:26b", enabled: true, share: false });
+    // 前の版の既定のモデル名は、Q4_K_M を明示した名前に読み替える
+    expect(old.config).toMatchObject({ mode: "remote", url: "http://192.168.1.20:11434", model: "gemma4:26b-a4b-it-q4_K_M", enabled: true, share: false });
+    expect(loadConfig(JSON.stringify({ mode: "builtin", model: "gemma4:e4b" })).config.model).toBe("gemma4:e4b-it-q4_K_M");
+    expect(loadConfig(JSON.stringify({ mode: "builtin", model: "qwen3:8b" })).config.model).toBe("qwen3:8b");
+    expect(loadConfig(JSON.stringify({ mode: "builtin" })).config.model).toBe("");
     const fresh = loadConfig(null);
     expect(fresh.config).toMatchObject({ mode: "builtin", model: "", enabled: false });
     const engine = { available: true, running: false, port: 11545, share: false, os: "macos", models_dir: "", log_path: "", lan_address: null, models: [], pid: null };
-    expect(effectiveModel(fresh.config, engine)).toBe("gemma4:e4b");
-    expect(effectiveModel(fresh.config, { ...engine, os: "windows" })).toBe("gemma4:26b");
+    expect(effectiveModel(fresh.config, engine)).toBe("gemma4:e4b-it-q4_K_M");
+    expect(effectiveModel(fresh.config, { ...engine, os: "windows" })).toBe("gemma4:26b-a4b-it-q4_K_M");
     expect(effectiveModel({ ...fresh.config, model: "gemma4:26b" }, engine)).toBe("gemma4:26b");
     expect(loadConfig("{壊れている").saved).toBe(false);
   });

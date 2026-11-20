@@ -24,14 +24,20 @@ export interface EngineInfo {
   pid: number | null;
 }
 
-/** 選べるモデル。Windows では 26B、Mac では E4B を最初に選んでおく。 */
+/** 選べるモデル（どちらも Q4_K_M の量子化）。Windows では 26B、Mac では E4B を最初に選んでおく。 */
 export const BUILTIN_MODELS = [
-  { name: "gemma4:e4b", size: "9.6GB" },
-  { name: "gemma4:26b", size: "18GB" },
+  { name: "gemma4:e4b-it-q4_K_M", size: "9.6GB" },
+  { name: "gemma4:26b-a4b-it-q4_K_M", size: "18GB" },
 ] as const;
 
+/** 前の版で既定だったモデルの名前と、いまの名前 */
+export const RENAMED_MODELS: Record<string, string> = {
+  "gemma4:e4b": "gemma4:e4b-it-q4_K_M",
+  "gemma4:26b": "gemma4:26b-a4b-it-q4_K_M",
+};
+
 export function defaultModel(os: string): string {
-  return os === "windows" ? "gemma4:26b" : "gemma4:e4b";
+  return os === "windows" ? "gemma4:26b-a4b-it-q4_K_M" : "gemma4:e4b-it-q4_K_M";
 }
 
 export function engineUrl(info: Pick<EngineInfo, "port">): string {
