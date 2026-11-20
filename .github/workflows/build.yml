@@ -126,15 +126,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          cargo build --release --manifest-path src-tauri/engine/Cargo.toml --example smoke
+          # cargo run を挟まず直接動かす（強制終了するとき、プロセス番号がこのプログラム自身になるように）
+          bin=src-tauri/engine/target/release/examples/smoke
+          if [ "$RUNNER_OS" = "Windows" ]; then bin="$bin.exe"; fi
+          models=gemma3:270m,qwen2.5:0.5b
           smoke() {
-            cargo run --release --manifest-path src-tauri/engine/Cargo.toml --example smoke -- \
-              src-tauri/engine-dist/ollama gemma3:270m,qwen2.5:0.5b "$@"
+            "$bin" src-tauri/engine-dist/ollama "$models" "$@"
           }
+          # エンジン（とその見張り役・子プロセス）だけを探す。確かめるプログラム自身の引数には当たらない
           leftovers() {
             if [ "$RUNNER_OS" = "Windows" ]; then
               tasklist | grep -iE "ollama|llama-server" || true
             else
-              pgrep -fl "engine-dist/ollama" || true
+              pgrep -fl "engine-dist/ollama/" || true
             fi
           }
           smoke
@@ -149,11 +154,13 @@ jobs:
           [ -z "$left" ] || { echo "::error::止めずに終わった後にプロセスが残っています"; echo "$left"; exit 1; }
           if [ "$RUNNER_OS" != "Windows" ]; then
             # アプリが強制終了された場合も、見張り役が止めること
-            smoke wait > "$RUNNER_TEMP/smoke-wait.log" 2>&1 &
+            "$bin" src-tauri/engine-dist/ollama "$models" wait > "$RUNNER_TEMP/smoke-wait.log" 2>&1 &
             pid=$!
             for _ in $(seq 1 240); do grep -q "止めずに待ちます" "$RUNNER_TEMP/smoke-wait.log" && break; sleep 1; done
             grep -q "止めずに待ちます" "$RUNNER_TEMP/smoke-wait.log" || { cat "$RUNNER_TEMP/smoke-wait.log"; exit 1; }
+            ps -o pid=,comm= -p "$pid"
             kill -9 "$pid"
+            wait "$pid" 2>/dev/null || true
             sleep 3
             left="$(leftovers)"
             [ -z "$left" ] || { echo "::error::強制終了の後にプロセスが残っています"; echo "$left"; exit 1; }
