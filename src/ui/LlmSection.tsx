@@ -97,10 +97,24 @@ function BuiltinSettings() {
   const state = useAnalysisState();
   const { config, engine, pull, localModels } = state;
   const model = state.model;
-  const known = BUILTIN_MODELS.some((m) => m.name === model);
-  const [custom, setCustom] = useState(known ? "" : model);
+  const listed = (name: string) => BUILTIN_MODELS.some((m) => m.name === name);
+  // 「その他」を選んでから名前を確定するまでも、入力欄を出しておく
+  const [customOpen, setCustomOpen] = useState(false);
+  // 入力中の名前（入力していなければ、いまのモデルの名前を出す）
+  const [draft, setDraft] = useState<string | null>(null);
+  const showCustom = customOpen || !listed(model);
   const installed = localModels?.some((m) => sameModel(m, model)) ?? null;
   const percent = pull && pull.total > 0 ? Math.floor((pull.completed / pull.total) * 100) : 0;
+
+  const commitCustom = () => {
+    // Enter と、その後の blur の両方から呼ばれても、保存は1回にする
+    const current = analysis.getState().model;
+    const name = (draft ?? current).trim();
+    setDraft(null);
+    if (!name) return;
+    if (listed(name)) setCustomOpen(false);
+    if (name !== current) void analysis.setConfig({ model: name });
+  };
 
   return (
     <div className="form">
@@ -108,11 +122,16 @@ function BuiltinSettings() {
         <span className="field-label">モデル</span>
         <select
           className="input narrow"
-          value={known ? model : "custom"}
+          value={showCustom ? "custom" : model}
           disabled={!!pull}
           onChange={(e) => {
-            if (e.target.value !== "custom") void analysis.setConfig({ model: e.target.value });
-            else setCustom(model);
+            setDraft(null);
+            if (e.target.value === "custom") {
+              setCustomOpen(true);
+            } else {
+              setCustomOpen(false);
+              if (e.target.value !== model) void analysis.setConfig({ model: e.target.value });
+            }
           }}
         >
           {BUILTIN_MODELS.map((m) => (
@@ -123,18 +142,24 @@ function BuiltinSettings() {
           <option value="custom">その他</option>
         </select>
       </label>
-      {!known && (
+      {showCustom && (
         <label className="field">
           <span className="field-label">モデルの名前</span>
           <input
             className="input"
-            value={custom}
+            value={draft ?? model}
             placeholder="gemma4:e4b"
+            autoFocus={customOpen}
+            disabled={!!pull}
             autoCapitalize="none"
             autoCorrect="off"
             spellCheck={false}
-            onChange={(e) => setCustom(e.target.value)}
-            onBlur={() => custom.trim() && custom.trim() !== config.model && void analysis.setConfig({ model: custom.trim() })}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              // 日本語変換の確定の Enter では確定しない
+              if (e.key === "Enter" && !e.nativeEvent.isComposing) commitCustom();
+            }}
+            onBlur={commitCustom}
           />
         </label>
       )}
