@@ -16,6 +16,11 @@ tauri = { version = "2", features = [] }
 tauri-plugin-sql = { version = "2", features = ["sqlite"] }
 # 自分のPC（LAN内）で動かしているLLMのサーバーと話すため。通信は画面側ではなくRust側で行う。
 tauri-plugin-http = "=2.8.3"
+serde = { version = "1", features = ["derive"] }
+
+# 同梱した LLM のエンジン（Ollama）を起動・停止する部品。パソコン版だけで使う。
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+nikki-engine = { path = "engine" }
 
 [profile.release]
 opt-level = "s"

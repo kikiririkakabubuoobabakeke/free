@@ -8,21 +8,27 @@
  */
 
 export interface LlmConfig {
-  /** 例: http://192.168.1.20:11434 */
+  /** builtin: アプリに同梱したエンジンを、このPCの中で動かす／remote: ほかのPCのサーバーを使う */
+  mode: "builtin" | "remote";
+  /** remote のときのサーバー。例: http://192.168.1.20:11434 */
   url: string;
-  /** 例: gemma4:26b */
+  /** 例: gemma4:26b。空なら、このPCに合ったものを使う。 */
   model: string;
   /** 分析を進めるか */
   enabled: boolean;
   /** Ollama に渡す文脈の長さ（トークン数） */
   contextLength: number;
+  /** builtin のとき、同じネットワークの他の端末からも使えるようにするか */
+  share: boolean;
 }
 
 export const DEFAULT_LLM_CONFIG: LlmConfig = {
+  mode: "builtin",
   url: "",
-  model: "gemma4:26b",
+  model: "",
   enabled: false,
   contextLength: 8192,
+  share: false,
 };
 
 export type ServerKind = "ollama" | "openai";

@@ -5,7 +5,14 @@ import { entryMessages, validateEntryAnalysis, validateReview } from "../src/llm
 import { syncOnce } from "../src/sync/engine";
 import { FakeRemote, openTestDb } from "./helpers";
 
-const config: LlmConfig = { url: "http://192.168.1.20:11434", model: "gemma4:26b", enabled: true, contextLength: 8192 };
+const config: LlmConfig = {
+  mode: "remote",
+  url: "http://192.168.1.20:11434",
+  model: "gemma4:26b",
+  enabled: true,
+  contextLength: 8192,
+  share: false,
+};
 
 interface Call {
   url: string;
@@ -379,5 +386,48 @@ describe("気分・感情の集計と、週の振り返り", () => {
     expect((await other.repo.getAnalysis(ids["楽しい"]))!).toMatchObject({ summary: "楽しい日", mood: 2, stale: false });
     expect((await other.repo.getReview("2026-11-15"))!.stale).toBe(false);
     expect(await other.repo.analysisPending()).toBe(0);
+  });
+});
+
+describe("同梱のエンジン", () => {
+  it("モデルの取得の進み具合を、ファイルごとに足し合わせる（順番が前後しても減らさない）", async () => {
+    const { PullTracker } = await import("../src/llm/engine");
+    const t = new PullTracker();
+    expect(t.update({ status: "pulling manifest" })).toEqual({ status: "pulling manifest", completed: 0, total: 0 });
+    t.update({ status: "pulling a", digest: "sha256:a", total: 1000, completed: 100 });
+    t.update({ status: "pulling b", digest: "sha256:b", total: 10, completed: 10 });
+    t.update({ status: "pulling a", digest: "sha256:a", total: 1000, completed: 50 }); // 古い知らせ
+    expect(t.progress()).toEqual({ status: "pulling a", completed: 110, total: 1010 });
+    t.update({ status: "pulling a", digest: "sha256:a", total: 1000, completed: 1000 });
+    expect(t.done).toBe(false);
+    t.update({ status: "success" });
+    expect(t.done).toBe(true);
+    expect(t.progress()).toMatchObject({ completed: 1010, total: 1010 });
+    const failed = new PullTracker();
+    failed.update({ error: "pull model manifest: file does not exist" });
+    expect(failed.error).toContain("does not exist");
+  });
+
+  it("Windows では 26B、Mac とそれ以外では E4B を最初に選ぶ", async () => {
+    const { defaultModel, sameModel } = await import("../src/llm/engine");
+    expect(defaultModel("windows")).toBe("gemma4:26b");
+    expect(defaultModel("macos")).toBe("gemma4:e4b");
+    expect(defaultModel("linux")).toBe("gemma4:e4b");
+    expect(sameModel("gemma4", "gemma4:latest")).toBe(true);
+    expect(sameModel("GEMMA4:E4B", "gemma4:e4b")).toBe(true);
+    expect(sameModel("gemma4:e4b", "gemma4:26b")).toBe(false);
+  });
+
+  it("前の版の設定は、URL があれば「ほかのPCのサーバー」として引き継ぐ", async () => {
+    const { loadConfig, effectiveModel } = await import("../src/llm/controller");
+    const old = loadConfig(JSON.stringify({ url: "http://192.168.1.20:11434", model: "gemma4:26b", enabled: true, contextLength: 8192 }));
+    expect(old.config).toMatchObject({ mode: "remote", url: "http://192.168.1.20:11434", model: "gemma4:26b", enabled: true, share: false });
+    const fresh = loadConfig(null);
+    expect(fresh.config).toMatchObject({ mode: "builtin", model: "", enabled: false });
+    const engine = { available: true, running: false, port: 11545, share: false, os: "macos", models_dir: "", log_path: "", lan_address: null, models: [], pid: null };
+    expect(effectiveModel(fresh.config, engine)).toBe("gemma4:e4b");
+    expect(effectiveModel(fresh.config, { ...engine, os: "windows" })).toBe("gemma4:26b");
+    expect(effectiveModel({ ...fresh.config, model: "gemma4:26b" }, engine)).toBe("gemma4:26b");
+    expect(loadConfig("{壊れている").saved).toBe(false);
   });
 });

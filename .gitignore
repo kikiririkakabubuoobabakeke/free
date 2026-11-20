@@ -6,3 +6,7 @@ src-tauri/gen
 .env.local
 *.log
 .DS_Store
+
+# 同梱する LLM のエンジン（ビルドのときに取ってくる。リポジトリには入れない）
+src-tauri/engine-dist
+src-tauri/engine/target

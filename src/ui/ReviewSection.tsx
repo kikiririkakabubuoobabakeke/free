@@ -23,7 +23,7 @@ export function ReviewSection({ today }: { today: string }) {
   const entries = useQuery(() => repo.weekEntries(start, end), [start, end]);
   const latest = useQuery(() => repo.latestReviewStart(), []);
 
-  const configured = state.config.enabled && !!state.config.url;
+  const configured = state.configured;
   if (review === undefined || entries === undefined || latest === undefined) return null;
   // ローカルLLMを使っておらず、振り返りも1つも無ければ、この欄は出さない
   if (!configured && latest === null) return null;

@@ -38,7 +38,7 @@ export function HomePage({ standalone }: { standalone?: boolean }) {
   const moods = useQuery(() => repo.moodByDay(from, to), [from, to]);
   const [modeState, setModeState] = useState<CalendarMode>(loadMode);
   // 気分で色分けできるのは、ローカルLLMを使っているか、気分の分析が1件でもあるとき
-  const canMood = (analysis.config.enabled && !!analysis.config.url) || (moods?.size ?? 0) > 0;
+  const canMood = analysis.configured || (moods?.size ?? 0) > 0;
   const mode: CalendarMode = canMood ? modeState : "chars";
   const setMode = (m: CalendarMode) => {
     setModeState(m);

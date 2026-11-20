@@ -34,7 +34,7 @@ export function AnalysisPanel({ entry }: { entry: EntryDetail }) {
     [ideaDates.join(",")],
   );
 
-  const configured = state.config.enabled && !!state.config.url;
+  const configured = state.configured;
   const hasContent = !!(entry.title.trim() || entry.body.trim() || entry.structures.length);
   const trashed = entry.trashed_at !== null;
   if (analysis === undefined) return null;
@@ -72,7 +72,9 @@ export function AnalysisPanel({ entry }: { entry: EntryDetail }) {
           <span className="hint">分析中…</span>
         ) : waiting ? (
           <>
-            <span className="hint">{state.phase === "unreachable" ? "つながりません" : "分析待ち"}</span>
+            <span className="hint">
+              {state.phase === "unreachable" ? "つながりません" : state.phase === "needs-model" ? "モデル未導入" : "分析待ち"}
+            </span>
             <button type="button" className="btn ghost small" onClick={() => controller.analyzeNow(entry.id)}>
               今すぐ
             </button>

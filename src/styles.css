@@ -2046,3 +2046,36 @@ textarea.input {
 .llm-note {
   overflow-wrap: anywhere;
 }
+
+/* 設定：同梱のエンジンのモデルの取得 */
+.llm-card .segmented {
+  align-self: flex-start;
+  margin: 0;
+}
+
+.pull {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.pull-bar {
+  height: 6px;
+  border-radius: 99px;
+  background: var(--accent-soft);
+  overflow: hidden;
+}
+
+.pull-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--accent);
+  transition: width 0.3s;
+}
+
+.path-hint {
+  overflow-wrap: anywhere;
+  font-size: 11.5px;
+}

@@ -2298,10 +2298,20 @@ checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
 name = "nikki"
 version = "0.1.0"
 dependencies = [
+ "nikki-engine",
+ "serde",
  "tauri",
  "tauri-build",
  "tauri-plugin-http",
  "tauri-plugin-sql",
+]
+
+[[package]]
+name = "nikki-engine"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
