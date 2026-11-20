@@ -103,12 +103,16 @@ jobs:
           curl -fsSL --retry 3 -o "$RUNNER_TEMP/sha256sum.txt" "$base/sha256sum.txt"
           expected="$(grep -E "[ *](\./)?${ASSET}\$" "$RUNNER_TEMP/sha256sum.txt" | awk '{print $1}' | head -1)"
           [ -n "$expected" ] || { echo "::error::sha256sum.txt に $ASSET がありません"; exit 1; }
+          # ファイル名を渡すと、Windows の「\」入りの場所では出力の頭に「\」が付くので、中身を標準入力から読ませる
           if command -v sha256sum > /dev/null; then
-            actual="$(sha256sum "$RUNNER_TEMP/$ASSET" | awk '{print $1}')"
+            actual="$(sha256sum < "$RUNNER_TEMP/$ASSET" | awk '{print $1}')"
           else
-            actual="$(shasum -a 256 "$RUNNER_TEMP/$ASSET" | awk '{print $1}')"
+            actual="$(shasum -a 256 < "$RUNNER_TEMP/$ASSET" | awk '{print $1}')"
           fi
-          [ "$expected" = "$actual" ] || { echo "::error::$ASSET のハッシュ値が公開されているものと一致しません"; exit 1; }
+          [ "$expected" = "$actual" ] || {
+            echo "::error::$ASSET のハッシュ値が公開されているものと一致しません（公開: $expected / 取ってきたもの: $actual）"
+            exit 1
+          }
           echo "$ASSET のハッシュ値を確かめました: $actual"
           mkdir -p src-tauri/engine-dist/ollama
           case "$ASSET" in

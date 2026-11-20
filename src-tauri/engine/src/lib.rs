@@ -17,6 +17,18 @@ use std::process::{Child, ChildStdin, Command, Stdio};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
+/// macOS / Linux でエンジンを起動する見張り役（/bin/sh の中身。$0 がエンジンの実行ファイル）。
+/// 裏で動かす処理は標準入力が /dev/null に差し替えられるので、管は fd 3 に写してから渡す。
+#[cfg(unix)]
+const WATCHDOG: &str = r#"exec 3<&0
+"$0" serve </dev/null 3<&- &
+engine=$!
+( read line <&3; kill -TERM 0 ) &
+exec 3<&-
+wait "$engine"
+kill -TERM 0
+"#;
+
 /// 同梱のエンジンが待ち受けるポート。ふだんの Ollama（11434）とぶつからないよう、別の番号にする。
 pub const DEFAULT_PORT: u16 = 11545;
 
@@ -72,7 +84,9 @@ impl Engine {
             });
         }
 
-        let exe = executable(&config.engine_dir);
+        // 作業フォルダーをエンジンのフォルダーに移してから起動するので、場所は絶対パスにそろえておく
+        let engine_dir = std::path::absolute(&config.engine_dir)?;
+        let exe = executable(&engine_dir);
         if !exe.is_file() {
             return Err(io::Error::new(
                 io::ErrorKind::NotFound,
@@ -88,11 +102,13 @@ impl Engine {
 
         #[cfg(unix)]
         let mut command = {
-            // 見張り役：エンジンを裏で起動し、管（標準入力）が閉じるまで待つ。
-            // 閉じたら（アプリが終わった・落ちた）、自分のプロセスグループ（エンジンと、その子プロセス）ごと止める。
+            // 見張り役：エンジンを裏で起動し、
+            // - アプリとの管（標準入力。fd 3 に写して見張る）が閉じたら（アプリが終わった・落ちた）
+            // - エンジンが自分で終わったら
+            // のどちらでも、自分のプロセスグループ（エンジンと、その子プロセス）ごと止める。
             let mut c = Command::new("/bin/sh");
             c.arg("-c")
-                .arg("\"$0\" serve </dev/null &\nread _\nkill -TERM 0")
+                .arg(WATCHDOG)
                 .arg(&exe)
                 .stdin(Stdio::piped());
             c
@@ -104,7 +120,7 @@ impl Engine {
             c
         };
         command
-            .current_dir(&config.engine_dir)
+            .current_dir(&engine_dir)
             .env("OLLAMA_HOST", format!("{host}:{}", config.port))
             .env("OLLAMA_MODELS", &config.models_dir)
             // 続けて何件も分析する間はモデルを読み込んだままにし、使わなくなれば10分で手放す
